@@ -1,0 +1,25 @@
+name: Feature or detection signature
+description: Suggest a feature, or a client Warden should recognise
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - New detection signature (AI agent, tool, library)
+        - New feature
+        - Improvement to an existing feature
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: For a signature, include the exact User-Agent or header the client sends and a source for it.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it helps organisers

@@ -1,0 +1,12 @@
+{% set warden_pages = [
+  ('warden.overview', 'Overview'),
+  ('warden.activity', 'Client activity'),
+  ('warden.devices', 'Shared devices'),
+] %}
+<ul class="nav nav-pills mb-4">
+  {% for endpoint, label in warden_pages %}
+  <li class="nav-item">
+    <a class="nav-link {% if request.endpoint == endpoint %}active{% endif %}" href="{{ url_for(endpoint) }}">{{ label }}</a>
+  </li>
+  {% endfor %}
+</ul>

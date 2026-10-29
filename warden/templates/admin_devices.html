@@ -1,0 +1,83 @@
+{% extends "admin/base.html" %}
+
+{% macro remove(device_id) -%}
+<form method="POST" class="d-inline"><input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="remove"><input type="hidden" name="id" value="{{ device_id }}"><button type="submit" class="btn btn-sm btn-outline-secondary py-0">Remove</button></form>
+{%- endmacro %}
+
+{% block content %}
+<div class="jumbotron">
+  <div class="container">
+    <h1>Shared devices</h1>
+    <p>Browsers used by several accounts</p>
+  </div>
+</div>
+<div class="container">
+  {% include "plugins/warden/templates/_nav.html" %}
+  {% if not enabled %}<div class="alert alert-secondary">Device tracking is off. Turn it on from the Overview tab.</div>{% endif %}
+  {% if message %}<div class="alert alert-info" role="status">{{ message }}</div>{% endif %}
+  <p>
+    Every browser gets a random device ID cookie, and each account seen signed in from that browser is recorded.
+    A device used by accounts on <b>different {{ 'teams' if teams_mode else 'accounts' }}</b> is a strong sharing signal that a VPN
+    does not hide. Players can clear cookies, so treat it as evidence to look into, not proof.
+    {% if teams_mode %}Several members of the <i>same</i> team on one computer is normal and shown in grey.{% endif %}
+  </p>
+  <p class="text-muted">
+    {{ devices_total }} devices seen, {{ accounts_total }} device/account pairs,
+    <b>{{ cross_team | length }}</b> devices shared across {{ 'teams' if teams_mode else 'accounts' }}.
+  </p>
+  <form method="POST" class="mb-4" onsubmit="return confirm('Remove every device record?');">
+    <input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="clear">
+    <button type="submit" class="btn btn-sm btn-outline-danger">Clear all device records</button>
+  </form>
+
+  <h3>Devices shared across {{ 'teams' if teams_mode else 'accounts' }}</h3>
+  {% if cross_team %}
+  <div class="table-responsive">
+  <table class="table table-striped">
+    <thead><tr><th>Device</th><th>Accounts{% if teams_mode %} (team){% endif %}</th><th>Last seen</th><th>Last IP / browser</th><th></th></tr></thead>
+    <tbody>
+      {% for d in cross_team %}
+      <tr class="table-danger">
+        <td><code>{{ d.device_id[:12] }}&hellip;</code></td>
+        <td>
+          {% for row in d.rows %}
+            <a href="{{ url_for('admin.users_detail', user_id=row.user.id) }}">{{ row.user.name }}</a>
+            {% if teams_mode %}({% if row.user.team %}<a href="{{ url_for('admin.teams_detail', team_id=row.user.team.id) }}">{{ row.user.team.name }}</a>{% else %}no team{% endif %}){% endif %}
+            {% if not loop.last %}<br>{% endif %}
+          {% endfor %}
+        </td>
+        <td class="text-nowrap">{{ d.last_seen.strftime('%m-%d %H:%M') }} UTC</td>
+        <td><small>{{ d.ip }}<br><span class="text-muted">{{ (d.user_agent or '')[:60] }}</span></small></td>
+        <td>{{ remove(d.device_id) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="text-muted">No device has been used by more than one {{ 'team' if teams_mode else 'account' }}.</p>
+  {% endif %}
+
+  {% if teams_mode %}
+  <h3 class="mt-5">Devices used by several accounts of one team</h3>
+  {% if same_team %}
+  <table class="table table-sm">
+    <thead><tr><th>Device</th><th>Team</th><th>Accounts</th><th>Last seen</th><th></th></tr></thead>
+    <tbody>
+      {% for d in same_team %}
+      <tr class="text-muted">
+        <td><code>{{ d.device_id[:12] }}&hellip;</code></td>
+        <td>{% if d.team %}<a href="{{ url_for('admin.teams_detail', team_id=d.team.id) }}">{{ d.team.name }}</a>{% else %}no team{% endif %}</td>
+        <td>{% for row in d.rows %}{{ row.user.name }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+        <td class="text-nowrap">{{ d.last_seen.strftime('%m-%d %H:%M') }} UTC</td>
+        <td>{{ remove(d.device_id) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">None.</p>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

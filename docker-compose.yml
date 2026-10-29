@@ -1,0 +1,16 @@
+# Try Warden locally: `docker compose up`, then open http://localhost:8000 and run CTFd's setup.
+# For production, mount the warden folder into your own CTFd deployment the same way.
+services:
+  ctfd:
+    image: ctfd/ctfd:${CTFD_VERSION:-3.8.9}
+    ports:
+      - "${WARDEN_PORT:-8000}:8000"
+    environment:
+      - REDIS_URL=redis://cache:6379
+    volumes:
+      - ./warden:/opt/CTFd/CTFd/plugins/warden:ro
+    depends_on:
+      - cache
+
+  cache:
+    image: redis:7-alpine

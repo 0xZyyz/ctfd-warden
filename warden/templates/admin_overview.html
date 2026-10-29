@@ -1,0 +1,151 @@
+{% extends "admin/base.html" %}
+
+{% macro nonce(action) -%}
+<input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="{{ action }}">
+{%- endmacro %}
+
+{% block content %}
+<div class="jumbotron">
+  <div class="container">
+    <h1>Warden</h1>
+    <p>Anti-cheat and fair-play settings</p>
+  </div>
+</div>
+<div class="container">
+  {% include "plugins/warden/templates/_nav.html" %}
+  {% if message %}<div class="alert alert-info" role="status">{{ message }}</div>{% endif %}
+
+  <h3>Features</h3>
+  <form method="POST" class="mb-5">
+    {{ nonce('features') }}
+    {% for f in features %}
+    <div class="custom-control custom-switch mb-2">
+      <input type="checkbox" class="custom-control-input" id="feature-{{ f.name }}" name="{{ f.name }}" {% if f.enabled %}checked{% endif %} {% if f.forced %}disabled{% endif %}>
+      <label class="custom-control-label" for="feature-{{ f.name }}">
+        <b>{{ f.title }}</b> &mdash; {{ f.description }}
+        {% if f.forced %}<span class="badge badge-warning">set by WARDEN_{{ f.name | upper }}</span>{% endif %}
+      </label>
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary mt-2">Save features</button>
+  </form>
+
+  <hr class="my-5">
+
+  <h3>Flag brute-force lockout {% if not enabled.flag_lockout %}<span class="badge badge-secondary">off</span>{% endif %}</h3>
+  <p>
+    On top of CTFd's per-IP limit, a {{ 'team' if teams_mode else 'user' }} that submits too many wrong flags on one
+    challenge is blocked from that challenge for a while. Humans rarely reach these numbers; scripts do.
+    Changes apply immediately.
+  </p>
+  <form method="POST" class="form-inline mb-3">
+    {{ nonce('lock-settings') }}
+    <label class="mr-2" for="lock-threshold">Lock after</label>
+    <input type="number" min="5" max="10000" class="form-control mr-2" style="width:7em" id="lock-threshold" name="threshold" value="{{ lock.threshold }}">
+    <label class="mr-2" for="lock-window">wrong attempts on one challenge within</label>
+    <input type="number" min="60" max="86400" class="form-control mr-2" style="width:7em" id="lock-window" name="window" value="{{ lock.window }}">
+    <label class="mr-2" for="lock-duration">seconds, for</label>
+    <input type="number" min="60" max="86400" class="form-control mr-2" style="width:7em" id="lock-duration" name="duration" value="{{ lock.duration }}">
+    <label class="mr-3">seconds.</label>
+    <button type="submit" class="btn btn-primary">Save</button>
+  </form>
+  {% if lockouts %}
+  <form method="POST" class="mb-3" onsubmit="return confirm('Remove every lockout entry?');">
+    {{ nonce('clear-lockouts') }}
+    <button type="submit" class="btn btn-sm btn-outline-danger">Clear all lockout entries</button>
+  </form>
+  <div class="table-responsive">
+  <table class="table table-striped table-sm">
+    <thead><tr><th>Time (UTC)</th><th>Team</th><th>Triggered by</th><th>Challenge</th><th>Wrong attempts</th><th>IP</th><th></th></tr></thead>
+    <tbody>
+      {% for e in lockouts %}
+      <tr>
+        <td class="text-nowrap">{{ e.date.strftime('%m-%d %H:%M:%S') }}</td>
+        <td>{% if e.team %}<a href="{{ url_for('admin.teams_detail', team_id=e.team.id) }}">{{ e.team.name }}</a>{% else %}&mdash;{% endif %}</td>
+        <td>{% if e.user %}<a href="{{ url_for('admin.users_detail', user_id=e.user.id) }}">{{ e.user.name }}</a>{% else %}&mdash;{% endif %}</td>
+        <td>{% if e.challenge %}<a href="{{ url_for('admin.challenges_detail', challenge_id=e.challenge.id) }}">{{ e.challenge.name }}</a>{% else %}#{{ e.challenge_id }}{% endif %}</td>
+        <td>{{ e.attempts }}</td>
+        <td>{{ e.ip }}</td>
+        <td><form method="POST" class="d-inline">{{ nonce('remove-lockout') }}<input type="hidden" name="id" value="{{ e.id }}"><button type="submit" class="btn btn-sm btn-outline-secondary py-0">Remove</button></form></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="text-muted">Nobody has been locked out yet.</p>
+  {% endif %}
+
+  <hr class="my-5">
+
+  <h3>Challenge blocks</h3>
+  <p>
+    Bar one {{ 'team' if teams_mode else 'user' }} from one challenge, for example after revoking a solve for flag sharing.
+    The challenge disappears from their list and submissions are refused.
+  </p>
+  <form method="POST" class="form-inline mb-3">
+    {{ nonce('add-block') }}
+    <label class="mr-2" for="block-challenge">Challenge</label>
+    <select class="form-control mr-3" id="block-challenge" name="challenge_id" required>
+      {% for id, name in challenges %}<option value="{{ id }}">{{ name }} (#{{ id }})</option>{% endfor %}
+    </select>
+    <label class="mr-2" for="block-account">{{ 'Team' if teams_mode else 'User' }} ID</label>
+    <input type="number" min="1" class="form-control mr-3" style="width:8em" id="block-account" name="account_id" required>
+    <button type="submit" class="btn btn-danger">Block</button>
+  </form>
+  {% if blocks %}
+  <table class="table table-sm">
+    <thead><tr><th>Challenge</th><th>Account</th><th></th></tr></thead>
+    <tbody>
+      {% for b in blocks %}
+      <tr>
+        <td><a href="{{ url_for('admin.challenges_detail', challenge_id=b.challenge_id) }}">{{ b.challenge }}</a></td>
+        <td><a href="{{ url_for(b.endpoint, **b.args) }}">{{ b.name }}</a></td>
+        <td><form method="POST" class="d-inline">{{ nonce('remove-block') }}<input type="hidden" name="challenge_id" value="{{ b.challenge_id }}"><input type="hidden" name="account" value="{{ b.account }}"><button type="submit" class="btn btn-sm btn-outline-secondary py-0">Unblock</button></form></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">No challenge is blocked for anyone.</p>
+  {% endif %}
+
+  {% if enabled.regional_brackets %}
+  <hr class="my-5">
+
+  <h3>Regional brackets</h3>
+  <p>
+    {{ 'Teams are' if teams_mode else 'Users are' }} placed automatically: <b>{{ region.name }}</b> when every member has a
+    nationality from the list below, <b>{{ region.outside_name }}</b> otherwise (a missing nationality counts as outside).
+    Players set their nationality in Settings &rarr; Profile &rarr; Country. A bracket you set by hand on
+    {{ 'a team' if teams_mode else 'a user' }} is kept until you reset it here.
+  </p>
+  <form method="POST" class="mb-3">
+    {{ nonce('region-settings') }}
+    <div class="form-row">
+      <div class="col-md-3 mb-2"><label for="region-name">Region bracket</label><input class="form-control" id="region-name" name="name" value="{{ region.name }}" maxlength="64" required></div>
+      <div class="col-md-3 mb-2"><label for="region-outside">Outside bracket</label><input class="form-control" id="region-outside" name="outside_name" value="{{ region.outside_name }}" maxlength="64" required></div>
+      <div class="col-md-6 mb-2"><label for="region-countries">Country codes (ISO 3166-1 alpha-2)</label><input class="form-control" id="region-countries" name="countries" value="{{ region.countries }}" required></div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save region</button>
+  </form>
+  {% if pinned %}
+  <table class="table table-striped">
+    <thead><tr><th>{{ 'Team' if teams_mode else 'User' }}</th><th>Bracket set by an admin</th><th></th></tr></thead>
+    <tbody>
+      {% for row in pinned %}
+      <tr>
+        <td><a href="{{ url_for(row.endpoint, **row.args) }}">{{ row.name }}</a></td>
+        <td>{{ row.bracket }}</td>
+        <td class="text-right"><form method="POST" class="d-inline">{{ nonce('reset-bracket') }}<input type="hidden" name="account" value="{{ row.account }}"><button type="submit" class="btn btn-sm btn-outline-secondary">Back to automatic</button></form></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form method="POST">{{ nonce('reset-brackets') }}<button type="submit" class="btn btn-outline-danger">Return everyone to automatic placement</button></form>
+  {% else %}
+  <p class="text-muted">No bracket has been set by hand; everyone is placed automatically.</p>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "admin/base.html" %}
+
+{% macro pager(p, key) %}
+  {% if p.pages > 1 %}
+  <nav class="d-flex align-items-center my-3" aria-label="{{ key }} pagination">
+    {% set args = request.args.to_dict() %}
+    {% if p.has_prev %}{% set _ = args.update({key: p.prev_num}) %}<a class="btn btn-sm btn-outline-secondary mr-3" href="{{ url_for('warden.activity', **args) }}">Previous</a>{% endif %}
+    <span>Page {{ p.page }} of {{ p.pages }} &middot; {{ p.total }} records</span>
+    {% if p.has_next %}{% set _ = args.update({key: p.next_num}) %}<a class="btn btn-sm btn-outline-secondary ml-3" href="{{ url_for('warden.activity', **args) }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+{% endmacro %}
+
+{% macro action(name, value=None) -%}
+<input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="{{ name }}">{% if value is not none %}<input type="hidden" name="id" value="{{ value }}">{% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="jumbotron">
+  <div class="container">
+    <h1>Client activity</h1>
+    <p>AI agent signals, automation and API access</p>
+  </div>
+</div>
+<div class="container">
+  {% include "plugins/warden/templates/_nav.html" %}
+  {% if not enabled %}<div class="alert alert-secondary">Client activity logging is off. Turn it on from the Overview tab.</div>{% endif %}
+  {% if message %}<div class="alert alert-info" role="status">{{ message }}</div>{% endif %}
+  <p class="text-muted">
+    These are self-reported client signals, not proof of AI use or rule violations. Headers can be changed, and API tokens
+    and automation are normal CTF tools. Similar requests are sampled once per user and client every ten minutes.
+  </p>
+
+  <form method="GET" class="form-inline mb-4">
+    <label class="mr-2" for="kind">Signal</label>
+    <select id="kind" name="kind" class="form-control mr-3">
+      <option value="">All signals</option>
+      {% for value, label in [('ai', 'AI client'), ('api-token', 'API token'), ('automation', 'Automation')] %}
+      <option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <label class="mr-2" for="user_id">User ID</label>
+    <input type="number" min="1" id="user_id" name="user_id" class="form-control mr-3" style="width:8em" value="{{ request.args.get('user_id', '') }}">
+    <button class="btn btn-primary mr-2" type="submit">Filter</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('warden.activity') }}">Reset</a>
+    <span class="ml-auto text-muted">{{ total }} matching events</span>
+  </form>
+
+  <details class="mb-4">
+    <summary>Player access tokens <span class="text-muted">({{ token_page.total }})</span></summary>
+    <p class="text-muted small mt-2">Creating a token is logged separately from sampled token requests. Token values are never shown.</p>
+    <div class="table-responsive"><table class="table table-hover">
+      <thead><tr><th>Player / team</th><th>Created (UTC)</th><th>Expiry</th><th>Description</th><th></th></tr></thead>
+      <tbody>{% for t in tokens %}<tr>
+        <td><a href="{{ url_for('admin.users_detail', user_id=t.user.id) }}">{{ t.user.name }}</a>{% if t.team %}<small class="d-block text-muted">{{ t.team.name }}</small>{% endif %}</td>
+        <td>{{ t.created.strftime('%Y-%m-%d %H:%M') if t.created }}</td>
+        <td>{{ 'Expired' if t.expired else (t.expiration.strftime('%Y-%m-%d') if t.expiration else 'No expiry') }}</td>
+        <td>{{ t.description or '—' }}</td>
+        <td><form method="POST">{{ action('revoke-token', t.id) }}<button class="btn btn-sm btn-outline-danger" type="submit">Revoke</button></form></td>
+      </tr>{% else %}<tr><td colspan="5" class="text-muted">No player tokens.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {{ pager(token_page, 'token_page') }}
+  </details>
+
+  <details class="mb-4">
+    <summary>Accounts on this page <span class="text-muted">({{ summary | length }})</span></summary>
+    <div class="table-responsive"><table class="table mt-2">
+      <thead><tr><th>Account</th><th>AI client</th><th>API token</th><th>Automation</th><th>Clients</th></tr></thead>
+      <tbody>{% for row in summary %}<tr>
+        <td>{% if row.team %}<a href="{{ url_for('admin.teams_detail', team_id=row.team.id) }}">{{ row.team.name }}</a>{% elif row.user %}<a href="{{ url_for('admin.users_detail', user_id=row.user.id) }}">{{ row.user.name }}</a>{% else %}Deleted account{% endif %}</td>
+        <td>{{ row.ai }}</td><td>{{ row.token }}</td><td>{{ row.auto }}</td><td>{{ row.labels | join(', ') }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </details>
+
+  <h3>Request history</h3>
+  <div class="table-responsive"><table class="table table-hover">
+    <thead><tr><th>Time (UTC)</th><th>Signal / client</th><th>Player / team</th><th>Request</th><th>Details</th></tr></thead>
+    <tbody>{% for e in events %}<tr>
+      <td class="text-nowrap">{{ e.date.strftime('%m-%d %H:%M:%S') }}</td>
+      <td><span class="badge badge-secondary">{{ e.kind }}</span><span class="d-block mt-1">{{ e.label }}</span></td>
+      <td>{% if e.user_id in users %}<a href="{{ url_for('admin.users_detail', user_id=e.user_id) }}">{{ users[e.user_id].name }}</a>{% else %}Deleted account{% endif %}{% if e.team_id in teams %}<small class="d-block text-muted">{{ teams[e.team_id].name }}</small>{% endif %}</td>
+      <td><code>{{ e.method }} {{ e.path or '' }}</code></td>
+      <td><details><summary>Inspect</summary>
+        <dl class="small mt-2 mb-2">
+          <dt>IP</dt><dd>{{ e.ip }}</dd>
+          <dt>User-Agent</dt><dd>{{ e.user_agent or '—' }}</dd>
+          <dt>Referer</dt><dd>{{ e.referer or '—' }}</dd>
+        </dl>
+        <form method="POST">{{ action('remove', e.id) }}<button class="btn btn-sm btn-outline-danger" type="submit">Remove event</button></form>
+      </details></td>
+    </tr>{% else %}<tr><td colspan="5" class="text-muted">No events match these filters.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {{ pager(pagination, 'page') }}
+
+  <details class="mt-4 mb-5">
+    <summary class="text-danger">Bulk actions</summary>
+    <p class="text-muted small mt-2">These apply to all player tokens or all events, including records outside the current filters.</p>
+    <form method="POST" class="d-inline" onsubmit="return confirm('Revoke every player API token?');">{{ action('revoke-all-tokens') }}<button class="btn btn-sm btn-outline-danger" type="submit">Revoke all player tokens</button></form>
+    <form method="POST" class="d-inline" onsubmit="return confirm('Permanently remove all client activity events?');">{{ action('clear') }}<button class="btn btn-sm btn-outline-danger" type="submit">Clear all events</button></form>
+  </details>
+</div>
+{% endblock %}

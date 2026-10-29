@@ -1,0 +1,24 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: CTFd ${{ matrix.ctfd }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ctfd: ["3.8.0", "3.8.9"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the test suite inside ctfd/ctfd:${{ matrix.ctfd }}
+        run: scripts/test-docker.sh
+        env:
+          CTFD_VERSION: ${{ matrix.ctfd }}

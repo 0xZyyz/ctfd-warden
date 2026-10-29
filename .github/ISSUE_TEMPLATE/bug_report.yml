@@ -1,0 +1,37 @@
+name: Bug report
+description: Something in Warden does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Security issues go through SECURITY.md (private report), not here.
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Warden version (or commit) and CTFd version
+      placeholder: Warden 1.0.0, CTFd 3.8.9
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: User mode, theme, Redis or not, reverse proxy
+      placeholder: teams mode, core theme, Redis, behind nginx
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: logs
+    attributes:
+      label: CTFd logs
+      description: Lines mentioning warden or a traceback. Remove player data first.
+      render: text
