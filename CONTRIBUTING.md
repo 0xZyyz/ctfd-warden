@@ -13,10 +13,11 @@ activity.py              client activity logging and /warden/client-signal
 detection.py             User-Agent / header classification (AI agents, automation, tools)
 devices.py               device-ID cookie and shared-device records
 lockout.py               flag brute-force lockout
+sharing.py               flag sharing (same unique flag from two accounts)
 blocks.py                per-account challenge blocks
 privacy.py               team privacy response filtering
 brackets.py              regional brackets
-admin.py                 the three admin pages
+admin.py                 the admin pages
 models.py, migrations/   database tables (alembic, run by CTFd on startup)
 templates/, assets/      admin page templates and the automation-signal script
 tests/                   pytest suite (development only)

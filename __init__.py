@@ -17,7 +17,7 @@ from CTFd.plugins import (
 from CTFd.plugins.migrations import upgrade
 from CTFd.utils.user import authed, get_current_user, is_admin
 
-from . import activity, admin, blocks, brackets, devices, lockout, privacy, settings  # noqa: F401
+from . import activity, admin, blocks, brackets, devices, lockout, privacy, settings, sharing  # noqa: F401
 from .common import ASSETS, PLUGIN_NAME, blueprint, request_path, template
 
 log = logging.getLogger("warden")
@@ -47,6 +47,8 @@ def _before_request():
         locked = lockout.before_request(path, user)
         if locked is not None:
             return locked
+    if on("flag_sharing"):
+        sharing.before_request(path, user)
     return None
 
 
@@ -65,6 +67,8 @@ def _after_request(response):
             activity.after_request(response)
         if on("flag_lockout"):
             lockout.after_request(response)
+        if on("flag_sharing"):
+            sharing.after_request(response)
         if on("device_tracking"):
             devices.after_request(response)
         if on("regional_brackets"):
@@ -88,6 +92,6 @@ def load(app):
         lockout.warn_without_redis()
     app.before_request(_before_request)
     app.after_request(_after_request)
-    # One navbar link; the Warden pages have their own tabs (Overview, Client activity, Shared devices).
+    # One navbar link; the Warden pages have their own tabs.
     register_admin_plugin_menu_bar("Warden", "/admin/warden")
     app.jinja_env.globals["warden_nav"] = template("_nav.html")

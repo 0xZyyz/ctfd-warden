@@ -1,0 +1,86 @@
+{% extends "admin/base.html" %}
+
+{% macro account(team_id, user_id) -%}
+{% if teams_mode and team_id in teams %}<a href="{{ url_for('admin.teams_detail', team_id=team_id) }}">{{ teams[team_id].name }}</a>{% elif teams_mode %}Deleted team{% endif %}
+{%- if user_id in users %}<small class="d-block text-muted"><a class="text-muted" href="{{ url_for('admin.users_detail', user_id=user_id) }}">{{ users[user_id].name }}</a></small>{% elif not teams_mode %}Deleted user{% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="jumbotron">
+  <div class="container">
+    <h1>Flag sharing</h1>
+    <p>The same unique flag submitted by two {{ 'teams' if teams_mode else 'players' }}</p>
+  </div>
+</div>
+<div class="container">
+  {% include warden_nav %}
+  {% if not enabled %}<div class="alert alert-secondary">Flag sharing detection is off. Turn it on from the Overview tab.</div>{% endif %}
+  {% if message %}<div class="alert alert-info" role="status">{{ message }}</div>{% endif %}
+
+  <p>
+    Some challenges give every {{ 'team' if teams_mode else 'player' }} or connection its own flag: an instancer, or a remote
+    service that prints a random suffix accepted by a regex flag (for example <code>flag\{deja_vu_[0-9a-f]{16}\}</code>).
+    On those, the same flag coming from two {{ 'teams' if teams_mode else 'players' }} means it was passed between them.
+  </p>
+  <p class="text-muted">
+    Only watched challenges are checked: with a normal static flag, everyone submits the same string. Every submission is
+    compared, accepted or not, so a flag that belongs to another team's instance is caught even when CTFd rejects it.
+  </p>
+
+  <form method="POST" class="mb-5">
+    <input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="watch">
+    <h3>Challenges with unique flags</h3>
+    {% if challenges %}
+    <div class="table-responsive"><table class="table table-sm">
+      <thead><tr><th style="width:3em">Watch</th><th>Challenge</th><th>Category</th><th>Type</th><th>Flag types</th></tr></thead>
+      <tbody>{% for c in challenges %}<tr>
+        <td><input type="checkbox" name="challenge_id" value="{{ c.id }}" aria-label="Watch {{ c.name }}" {% if c.watched %}checked{% endif %}></td>
+        <td>{{ c.name }}</td>
+        <td class="text-muted">{{ c.category }}</td>
+        <td><code>{{ c.type }}</code></td>
+        <td>{% for t in c.flag_types %}<span class="badge {{ 'badge-info' if t == 'regex' else 'badge-secondary' }} mr-1">{{ t }}</span>{% else %}<span class="text-muted">none</span>{% endfor %}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    <button type="submit" class="btn btn-primary">Save watched challenges</button>
+    {% else %}
+    <p class="text-muted">There are no challenges yet.</p>
+    {% endif %}
+  </form>
+
+  <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Shared flags <span class="text-muted h5">({{ total }})</span></h3>
+    <form method="POST" class="mb-0">
+      <input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="scan">
+      <button type="submit" class="btn btn-outline-primary">Scan past submissions</button>
+    </form>
+  </div>
+  <p class="text-muted small">"First submitted by" is the earliest correct submission of that flag, usually the account it was issued to.</p>
+  <div class="table-responsive"><table class="table table-hover">
+    <thead><tr><th>Time (UTC)</th><th>Challenge</th><th>First submitted by</th><th>Also submitted by</th><th>Result</th><th>Details</th></tr></thead>
+    <tbody>{% for e in events %}<tr>
+      <td class="text-nowrap">{{ e.date.strftime('%m-%d %H:%M:%S') }}</td>
+      <td>{% if e.challenge_id in names %}<a href="{{ url_for('admin.challenges_detail', challenge_id=e.challenge_id) }}">{{ names[e.challenge_id] }}</a>{% else %}#{{ e.challenge_id }}{% endif %}</td>
+      <td>{{ account(e.owner_team_id, e.owner_user_id) }}{% if e.owner_date %}<small class="d-block text-muted">{{ e.owner_date.strftime('%m-%d %H:%M:%S') }}</small>{% endif %}</td>
+      <td>{{ account(e.team_id, e.user_id) }}</td>
+      <td><span class="badge {{ 'badge-danger' if e.status in ('correct', 'already_solved') else 'badge-warning' }}">{{ e.status }}</span></td>
+      <td><details><summary>Inspect</summary>
+        <dl class="small mt-2 mb-2"><dt>Flag</dt><dd><code>{{ e.flag }}</code></dd><dt>IP</dt><dd>{{ e.ip or '—' }}</dd></dl>
+        <form method="POST"><input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="remove"><input type="hidden" name="id" value="{{ e.id }}"><button class="btn btn-sm btn-outline-danger" type="submit">Remove</button></form>
+      </details></td>
+    </tr>{% else %}<tr><td colspan="6" class="text-muted">No shared flags found.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if pagination.pages > 1 %}
+  <nav class="d-flex align-items-center my-3" aria-label="Pagination">
+    {% if pagination.has_prev %}<a class="btn btn-sm btn-outline-secondary mr-3" href="{{ url_for('warden.flag_sharing', page=pagination.prev_num) }}">Previous</a>{% endif %}
+    <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.has_next %}<a class="btn btn-sm btn-outline-secondary ml-3" href="{{ url_for('warden.flag_sharing', page=pagination.next_num) }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+  {% if events %}
+  <form method="POST" class="mt-3 mb-5" onsubmit="return confirm('Remove every shared-flag entry?');">
+    <input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="clear">
+    <button type="submit" class="btn btn-sm btn-outline-danger">Clear all entries</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

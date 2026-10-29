@@ -19,6 +19,7 @@ Every feature can be switched on or off from **Admin → Warden**, without a res
 | **Client activity** | on | Logs requests from self-identified AI agents (ChatGPT, Claude, Gemini, Perplexity, Cursor, browser-use, …), automation libraries and tools (`python-requests`, `curl`, Playwright, Selenium, sqlmap, …), CTFd API tokens, and in-page browser-automation marks such as `navigator.webdriver`. Player API tokens can be revoked from the same page. |
 | **Shared devices** | on | Every browser gets a random device-ID cookie. Devices used by accounts on different teams are listed, a strong account-sharing signal that a VPN does not hide. |
 | **Flag brute-force lockout** | on | A team (or user) that submits too many wrong flags on one challenge is locked out of that challenge for a while. Threshold, window and duration are configurable. |
+| **Flag sharing** | on | For challenges you mark as having unique flags (an instancer, or a remote service that prints a per-session suffix accepted by a regex flag), reports the same flag submitted by two teams: who had it first, who reused it, and whether CTFd accepted it. A scan button checks everything submitted before, so you can audit a finished event too. |
 | **Challenge blocks** | always available | Bar one team or user from one challenge, e.g. after revoking a solve for flag sharing. The challenge disappears from their list and submissions are refused. |
 | **Team privacy** | off | Hides team rosters, member countries and the user list from other players. Admins and the team itself still see everything. |
 | **Regional brackets** | off | Places each team (or user, in users mode) in a regional bracket such as *MENA* / *Outside MENA* from members' nationalities. Bracket names and country list are configurable; manual admin choices are kept. |
@@ -81,10 +82,24 @@ as locked on the admin page.
 | `WARDEN_CLIENT_ACTIVITY` | Client activity |
 | `WARDEN_DEVICE_TRACKING` | Shared devices |
 | `WARDEN_FLAG_LOCKOUT` | Flag brute-force lockout |
+| `WARDEN_FLAG_SHARING` | Flag sharing |
 | `WARDEN_TEAM_PRIVACY` | Team privacy |
 | `WARDEN_REGIONAL_BRACKETS` | Regional brackets |
 
 Use `1`/`0` (or `true`/`false`, `on`/`off`). Unset means the admin page decides.
+
+### Flag sharing
+
+Flag sharing can only be detected when teams get **different** flags. Two common ways:
+
+- **Remote services** (`nc`, web): have the service add a random suffix to the flag for every
+  connection, e.g. `flag{deja_vu_<16 hex>}`, and give the challenge a **regex** flag such as
+  `flag\{deja_vu_[0-9a-f]{16}\}`. Logging the suffix on the server side also lets you trace
+  any submitted flag back to one connection.
+- **Instancers** that put a different flag in every team's instance.
+
+Then tick the challenge on **Admin → Warden → Flag sharing**. Warden compares every submission on
+watched challenges, accepted or not, with the earlier correct submissions of other teams.
 
 ### Regional brackets
 
@@ -107,6 +122,7 @@ pages.
 | For flagged requests only: time, user, team, IP, User-Agent, Referer, method, path | `warden_client_events` | Client activity (sampled once per user and client every 10 minutes) |
 | Random device ID, user, last IP, User-Agent, first and last seen | `warden_device_sessions` + `warden_device` cookie (HttpOnly, 1 year) | Shared devices |
 | Lockouts: time, team, user, challenge, IP, attempt count | `warden_lockout_events` | Flag lockout |
+| Shared flags: challenge, flag, both teams and players, result, IP, time | `warden_flag_shares` | Flag sharing |
 | Settings, challenge blocks, manual brackets | CTFd's `config` table, keys `warden_*` | Configuration |
 
 Ordinary browser requests are never logged. Warden sends nothing to third parties.

@@ -1,16 +1,16 @@
-"""Admin pages: Warden (settings, lockouts, blocks, brackets), Client activity, Shared devices."""
+"""Admin pages: Warden (settings, lockouts, blocks, brackets), Client activity, Shared devices, Flag sharing."""
 
 from datetime import datetime
 
 import sqlalchemy as sa
 from flask import render_template, request
 
-from CTFd.models import Brackets, Challenges, Teams, Tokens, Users, db
+from CTFd.models import Brackets, Challenges, Flags, Teams, Tokens, Users, db
 from CTFd.utils.decorators import admins_only
 
-from . import blocks, brackets, settings
+from . import blocks, brackets, settings, sharing
 from .common import blueprint, handle_removal, teams_mode, template
-from .models import ClientEvent, DeviceSession, LockoutEvent
+from .models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
 
 
 def _feature_rows():
@@ -333,4 +333,60 @@ def devices():
         ).scalar(),
         accounts_total=DeviceSession.query.count(),
         message=message,
+    )
+
+
+@blueprint.route("/admin/warden/sharing", methods=["GET", "POST"])
+@admins_only
+def flag_sharing():
+    message = None
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "watch":
+            ids = {int(c) for c in request.form.getlist("challenge_id") if c.isdigit()}
+            known = {c for (c,) in db.session.query(Challenges.id).filter(Challenges.id.in_(ids))}
+            sharing.save_watched(known)
+            message = f"Watching {len(known)} challenge(s) for shared flags."
+        elif action == "scan":
+            message = f"Scan finished: {sharing.scan()} new shared flag(s) found."
+        else:
+            message = handle_removal(FlagShare)
+
+    flag_types = {}
+    for challenge_id, flag_type in db.session.query(Flags.challenge_id, Flags.type).distinct():
+        flag_types.setdefault(challenge_id, set()).add(flag_type)
+    watched = sharing.watched()
+    challenges = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "category": c.category,
+            "type": c.type,
+            "flag_types": sorted(flag_types.get(c.id, ())),
+            "watched": c.id in watched,
+        }
+        for c in Challenges.query.order_by(Challenges.category, Challenges.name).all()
+    ]
+    names = {c["id"]: c["name"] for c in challenges}
+
+    pagination = FlagShare.query.order_by(FlagShare.date.desc()).paginate(
+        page=max(1, request.args.get("page", 1, type=int)), per_page=100, error_out=False
+    )
+    events = pagination.items
+    user_ids = {i for e in events for i in (e.user_id, e.owner_user_id) if i}
+    team_ids = {i for e in events for i in (e.team_id, e.owner_team_id) if i}
+    users = {u.id: u for u in Users.query.filter(Users.id.in_(user_ids)).all()} if user_ids else {}
+    teams = {t.id: t for t in Teams.query.filter(Teams.id.in_(team_ids)).all()} if team_ids else {}
+    return render_template(
+        template("admin_sharing.html"),
+        enabled=settings.enabled("flag_sharing"),
+        message=message,
+        challenges=challenges,
+        names=names,
+        events=events,
+        users=users,
+        teams=teams,
+        total=pagination.total,
+        pagination=pagination,
+        teams_mode=teams_mode(),
     )

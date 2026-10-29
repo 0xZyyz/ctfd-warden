@@ -56,3 +56,33 @@ class LockoutEvent(db.Model):
     ip = db.Column(db.String(46))
     attempts = db.Column(db.Integer, nullable=False)
     date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class FlagShare(db.Model):
+    """The same unique flag submitted by two accounts on one challenge."""
+
+    __tablename__ = "warden_flag_shares"
+
+    id = db.Column(db.Integer, primary_key=True)
+    challenge_id = db.Column(
+        db.Integer, db.ForeignKey("challenges.id", ondelete="CASCADE"), nullable=True
+    )
+    flag = db.Column(db.String(255), nullable=False)
+    # The account that submitted this flag correctly first ...
+    owner_team_id = db.Column(
+        db.Integer, db.ForeignKey("teams.id", ondelete="SET NULL"), nullable=True
+    )
+    owner_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    owner_date = db.Column(db.DateTime, nullable=True)
+    # ... and the other account that submitted the same string.
+    team_id = db.Column(
+        db.Integer, db.ForeignKey("teams.id", ondelete="SET NULL"), nullable=True
+    )
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    status = db.Column(db.String(16))  # what CTFd answered: "correct", "incorrect", ...
+    ip = db.Column(db.String(46))
+    date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

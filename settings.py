@@ -31,6 +31,11 @@ FEATURES = {
         "Flag brute-force lockout",
         "Lock an account out of a challenge after too many wrong flags in a short window.",
     ),
+    "flag_sharing": (
+        True,
+        "Flag sharing",
+        "On challenges you mark as having unique flags, report the same flag submitted by two teams.",
+    ),
     "team_privacy": (
         False,
         "Team privacy",
