@@ -31,33 +31,32 @@ Every feature can be switched on or off from **Admin → Warden**, without a res
 
 ## Install
 
-1. Copy the `warden` folder into `CTFd/plugins/`, so you have `CTFd/plugins/warden/__init__.py`.
-2. Restart CTFd. Warden creates its tables on its own; there is no SQL or manual step.
-3. Open **Admin → Warden** and choose the features you want.
+This repository **is** the plugin. Put it in CTFd's plugins folder and restart CTFd:
 
-With the official Docker image, mount the folder:
+```sh
+cd CTFd/plugins
+git clone https://github.com/0xZyyz/ctfd-warden
+```
+
+That's it: Warden creates its tables on startup, then appears under **Admin → Warden**. Any folder
+name works; just keep the same name once CTFd has started with it, because CTFd records the
+plugin's database version under that name.
+
+If you run the official Docker image, mount the clone into the plugins folder the same way:
 
 ```yaml
 services:
   ctfd:
     image: ctfd/ctfd:3.8.9
     volumes:
-      - ./warden:/opt/CTFd/CTFd/plugins/warden:ro
+      - ./ctfd-warden:/opt/CTFd/CTFd/plugins/ctfd-warden:ro
 ```
-
-or bake it into your own image:
-
-```dockerfile
-FROM ctfd/ctfd:3.8.9
-COPY --chown=1001:1001 warden /opt/CTFd/CTFd/plugins/warden
-```
-
-To try it locally, clone this repository and run `docker compose up`, then open
-<http://localhost:8000>.
 
 ### Requirements
 
-- **CTFd 3.8.x.** Tested on 3.8.0 and 3.8.9 in CI. Older 3.x releases may work but are not tested.
+- **CTFd 3.8.x** with SQLite, MySQL/MariaDB or PostgreSQL. Tested on 3.8.0 and 3.8.9, and
+  end-to-end on MariaDB with Redis and several workers. Older 3.x releases may work but are not
+  tested.
 - **Redis is recommended.** It is the default in CTFd's docker-compose. With Redis, lockout
   counters are atomic across workers. Without it, Warden logs a warning and the lockout still
   works, but counters are per worker.
@@ -114,7 +113,8 @@ Ordinary browser requests are never logged. Warden sends nothing to third partie
 
 ## Development
 
-Tests run inside the official CTFd image, so nothing needs to be installed locally:
+The `tests/`, `scripts/` and `.github/` folders are for development only; CTFd ignores them.
+Tests run inside the official CTFd image, so only Docker is needed:
 
 ```sh
 scripts/test-docker.sh                       # CTFd 3.8.9

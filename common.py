@@ -1,3 +1,5 @@
+import os
+
 from flask import Blueprint, request
 
 from CTFd.models import db
@@ -5,7 +7,9 @@ from CTFd.utils import get_config
 
 blueprint = Blueprint("warden", __name__)
 
-PLUGIN_NAME = "warden"
+# The folder this plugin was installed as (e.g. "ctfd-warden" for a plain git clone). CTFd serves
+# plugin templates, assets and migrations by folder name, so nothing below assumes a fixed name.
+PLUGIN_NAME = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATES = f"plugins/{PLUGIN_NAME}/templates"
 ASSETS = f"/plugins/{PLUGIN_NAME}/assets/"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}

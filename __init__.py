@@ -1,7 +1,7 @@
 """Warden: anti-cheat and fair-play toolkit for CTFd.
 
-Drop this folder into ``CTFd/plugins/`` and restart CTFd. Everything is managed from
-Admin -> Plugins -> Warden; see README.md for each feature.
+Clone or copy this repository into ``CTFd/plugins/`` and restart CTFd. Everything is managed
+from Admin -> Warden; see README.md for each feature.
 """
 
 import logging
@@ -18,7 +18,7 @@ from CTFd.plugins.migrations import upgrade
 from CTFd.utils.user import authed, get_current_user, is_admin
 
 from . import activity, admin, blocks, brackets, devices, lockout, privacy, settings  # noqa: F401
-from .common import ASSETS, PLUGIN_NAME, blueprint, request_path
+from .common import ASSETS, PLUGIN_NAME, blueprint, request_path, template
 
 log = logging.getLogger("warden")
 
@@ -90,3 +90,4 @@ def load(app):
     app.after_request(_after_request)
     # One navbar link; the Warden pages have their own tabs (Overview, Client activity, Shared devices).
     register_admin_plugin_menu_bar("Warden", "/admin/warden")
+    app.jinja_env.globals["warden_nav"] = template("_nav.html")

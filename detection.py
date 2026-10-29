@@ -203,6 +203,7 @@ AUTOMATION = [
     ("nikto", "Nikto"),
     ("nuclei", "nuclei"),
     ("ffuf", "ffuf"),
+    ("fuzz faster u fool", "ffuf"),  # ffuf's default User-Agent
     ("gobuster", "gobuster"),
     ("dirbuster", "DirBuster"),
     ("dirb", "dirb"),

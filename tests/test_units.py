@@ -20,6 +20,7 @@ from CTFd.plugins.warden.detection import classify_client
         ("curl/8.0", "automation"),
         ("python-requests/2.32", "automation"),
         ("Mozilla/5.0 (compatible; ClaudeBot/1.0)", "ai"),
+        ("Fuzz Faster U Fool v2.1.0-dev", "automation"),
         ("Mozilla/5.0 Chrome/130", None),
         ("", "automation"),
     ],

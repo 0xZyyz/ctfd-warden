@@ -13,12 +13,12 @@ from CTFd.models import db
 from CTFd.utils.user import authed, get_current_user, get_ip, is_admin
 
 from . import settings
-from .common import blueprint, request_path
+from .common import ASSETS, blueprint, request_path
 from .detection import classify_client
 from .models import ClientEvent
 
 SAMPLE_WINDOW = 600
-IGNORED_PREFIXES = ("/themes/", "/files/", "/static/", "/plugins/warden/assets/")
+IGNORED_PREFIXES = ("/themes/", "/files/", "/static/", ASSETS)
 
 
 def _header(name, size=255):

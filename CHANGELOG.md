@@ -19,4 +19,5 @@ First public release, extracted from the anti-cheat plugin used at Securinets CT
 - Per-account challenge blocks with an admin UI.
 - Optional team privacy filtering and optional regional brackets (teams and users modes).
 - Admin pages (Overview, Client activity, Shared devices) and `WARDEN_*` environment overrides.
-- Works with any theme that renders `Plugins.scripts`; no CTFd core or theme changes needed.
+- Install by cloning the repository into `CTFd/plugins/` (any folder name); works with any theme
+  that renders `Plugins.scripts`, with no CTFd core or theme changes.

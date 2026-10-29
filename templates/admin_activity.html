@@ -23,7 +23,7 @@
   </div>
 </div>
 <div class="container">
-  {% include "plugins/warden/templates/_nav.html" %}
+  {% include warden_nav %}
   {% if not enabled %}<div class="alert alert-secondary">Client activity logging is off. Turn it on from the Overview tab.</div>{% endif %}
   {% if message %}<div class="alert alert-info" role="status">{{ message }}</div>{% endif %}
   <p class="text-muted">
