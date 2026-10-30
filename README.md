@@ -1,4 +1,4 @@
-# Warden — anti-cheat and fair-play plugin for CTFd
+# Warden — anti-cheat plugin for CTFd
 
 [![Tests](https://github.com/0xZyyz/ctfd-warden/actions/workflows/tests.yml/badge.svg)](https://github.com/0xZyyz/ctfd-warden/actions/workflows/tests.yml)
 ![CTFd 3.8](https://img.shields.io/badge/CTFd-3.8.x-blue)
@@ -6,10 +6,11 @@
 
 **Built with ❤️ to bring the old CTF era back: real skills, fair play, no shortcuts.**
 
-Warden gives CTF organisers the tools to keep a competition fair: detection of AI agents, scripts,
-shared accounts, shared flags and suspiciously fast solves, a per-challenge flag brute-force
-lockout, and per-team challenge bans. It grew out of the anti-cheat tooling used at
-**Securinets CTF Quals 2026**.
+Warden is an **anti-cheat plugin for CTFd**. It tracks the activity of every player and team
+during your CTF and shows you who is cheating: AI agents and scripts, shared accounts, flags passed
+between teams, flag brute-forcing and suspiciously fast solves, with one page per team that puts
+it all together. It also gives you the tools to act: per-challenge lockouts and per-team
+challenge bans. It grew out of the anti-cheat tooling used at **Securinets CTF Quals 2026**.
 
 Copy one folder into CTFd, restart, done. No theme changes, no CTFd core patches.
 
