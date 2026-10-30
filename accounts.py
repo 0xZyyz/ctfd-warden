@@ -7,9 +7,10 @@ from CTFd.models import Solves, Teams, Tokens, Users, db
 from . import blocks, fastsolves
 from .common import teams_mode
 from .filters import like
-from .models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
+from .models import ClientEvent, DeviceSession, FlagShare, HoneypotHit, LockoutEvent
 
 COLUMNS = (
+    ("honeypots", "Honeypot flags"),
     ("shared_flags", "Copied flags"),
     ("flag_sources", "Flags copied from them"),
     ("devices", "Shared devices"),
@@ -52,9 +53,10 @@ def summary():
         column, ClientEvent.kind
     ):
         counts[account][kind] += n
-    column = _column(LockoutEvent, "team_id", "user_id")
-    for account, n in db.session.query(column, sa.func.count()).group_by(column):
-        counts[account]["lockouts"] += n
+    for name, table in (("lockouts", LockoutEvent), ("honeypots", HoneypotHit)):
+        column = _column(table, "team_id", "user_id")
+        for account, n in db.session.query(column, sa.func.count()).group_by(column):
+            counts[account][name] += n
     for name, team_column, user_column in (
         ("shared_flags", "team_id", "user_id"),
         ("flag_sources", "owner_team_id", "owner_user_id"),
@@ -179,6 +181,11 @@ def detail(account_id):
             _column(FlagShare, "owner_team_id", "owner_user_id") == account_id
         )
         .order_by(FlagShare.date.desc())
+        .all(),
+        "honeypots": HoneypotHit.query.filter(
+            _column(HoneypotHit, "team_id", "user_id") == account_id
+        )
+        .order_by(HoneypotHit.date.desc())
         .all(),
         "bursts": _bursts(account_id),
         "devices": _devices(account_id, member_ids, owners) if member_ids else [],

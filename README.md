@@ -8,7 +8,7 @@
 
 Warden is an **anti-cheat plugin for CTFd**. It tracks the activity of every player and team
 during your CTF and shows you who is cheating: AI agents and scripts, shared accounts, flags passed
-between teams, flag brute-forcing and suspiciously fast solves, with one page per team that puts
+between teams, honeypot flags, flag brute-forcing and suspiciously fast solves, with one page per team that puts
 it all together. It also gives you the tools to act: per-challenge lockouts and per-team
 challenge bans. It grew out of the anti-cheat tooling used at **Securinets CTF Quals 2026**.
 
@@ -25,6 +25,7 @@ be filtered by player name, team name, challenge name and IP address.
 | **Shared devices** | on | Every browser gets a random device-ID cookie. Devices used by accounts on different teams are listed, a strong account-sharing signal that a VPN does not hide. |
 | **Flag brute-force lockout** | on | A team (or user) that submits too many wrong flags on one challenge is locked out of that challenge for a while. Threshold, window and duration are configurable. |
 | **Flag sharing** | on | For challenges you mark as having unique flags (an instancer, or a remote service that prints a per-session suffix accepted by a regex flag), reports the same flag submitted by two teams: who had it first, who reused it, and whether CTFd accepted it. A scan button checks everything submitted before, so you can audit a finished event too. |
+| **Honeypot flags** | on | Decoy flags you plant where only a cheater would take them from: a comment in a web page, a string in a binary, hidden text that AI agents read. Anyone who submits one, on any challenge or on the one you chose, is recorded with their team, IP and time. They only see the usual "incorrect". |
 | **Fast solves** | always available | Lists players who solved several challenges in a short time, by default 3 within 2 minutes, with the challenges and times. It reads CTFd's own solves, so it also works on a finished event. The numbers are configurable, and challenges meant to be instant, like a welcome flag, can be ignored. |
 | **Team pages** | always available | One page per team (or player, in users mode) with everything Warden found about it: flags it copied and flags copied from it, solve bursts, devices and IP addresses shared with other teams, AI and script activity, lockouts and blocks. A **Teams** tab ranks teams by how many signals they have. |
 | **Challenge blocks** | always available | Bar one team or user from one challenge, e.g. after revoking a solve for flag sharing. The challenge disappears from their list and submissions are refused. |
@@ -41,8 +42,10 @@ be filtered by player name, team name, challenge name and IP address.
 | ![Overview: feature switches, lockouts and challenge blocks](docs/screenshots/overview.png) | ![Client activity: AI agents, scripts and API tokens](docs/screenshots/client-activity.png) |
 | **Shared devices** | **Flag sharing** |
 | ![Shared devices: one browser used by two teams](docs/screenshots/shared-devices.png) | ![Flag sharing: a unique flag submitted by two teams](docs/screenshots/flag-sharing.png) |
-| **Fast solves** | **Team page** |
-| ![Fast solves: four challenges solved in twelve seconds](docs/screenshots/fast-solves.png) | ![Team page: every signal about one team](docs/screenshots/team.png) |
+| **Fast solves** | **Honeypots** |
+| ![Fast solves: four challenges solved in twelve seconds](docs/screenshots/fast-solves.png) | ![Honeypots: decoy flags and the players who submitted them](docs/screenshots/honeypots.png) |
+| **Team page** | |
+| ![Team page: every signal about one team](docs/screenshots/team.png) | |
 
 ## Install
 
@@ -97,6 +100,7 @@ as locked on the admin page.
 | `WARDEN_DEVICE_TRACKING` | Shared devices |
 | `WARDEN_FLAG_LOCKOUT` | Flag brute-force lockout |
 | `WARDEN_FLAG_SHARING` | Flag sharing |
+| `WARDEN_HONEYPOT_FLAGS` | Honeypot flags |
 | `WARDEN_TEAM_PRIVACY` | Team privacy |
 
 Use `1`/`0` (or `true`/`false`, `on`/`off`). Unset means the admin page decides.
@@ -125,6 +129,7 @@ pages.
 | Random device ID, user, last IP, User-Agent, first and last seen | `warden_device_sessions` + `warden_device` cookie (HttpOnly, 1 year) | Shared devices |
 | Lockouts: time, team, user, challenge, IP, attempt count | `warden_lockout_events` | Flag lockout |
 | Shared flags: challenge, flag, both teams and players, result, IP, time | `warden_flag_shares` | Flag sharing |
+| Honeypot hits: challenge, decoy flag, team, player, IP, time | `warden_honeypot_hits` | Honeypot flags |
 | Settings, challenge blocks, fast solve limits | CTFd's `config` table, keys `warden_*` | Configuration |
 
 Ordinary browser requests are never logged. Warden sends nothing to third parties.

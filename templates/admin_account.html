@@ -46,6 +46,7 @@
 
   <div class="d-flex flex-wrap mb-2">
     {% for label, n, anchor, cls in [
+      ('Honeypot flags', data.honeypots | length, 'honeypots', 'danger'),
       ('Copied flags', data.copied | length, 'sharing', 'danger'),
       ('Flags copied from them', data.sources | length, 'sharing', 'warning'),
       ('Fast solves', data.bursts | length, 'fast', 'warning'),
@@ -57,6 +58,18 @@
     <a href="#{{ anchor }}" class="mr-3 mb-2 text-decoration-none"><span class="badge badge-{{ cls if n else 'light' }} p-2">{{ n }}</span> <span class="text-muted">{{ label }}</span></a>
     {% endfor %}
   </div>
+
+  {{ section('Honeypot flags', data.honeypots | length, 'honeypots') }}
+  {% if data.honeypots %}
+  <div class="table-responsive"><table class="table table-sm">
+    <thead><tr><th>Time (UTC)</th><th>Player</th><th>Challenge</th><th>Decoy flag submitted</th><th>IP</th></tr></thead>
+    <tbody>{% for h in data.honeypots %}<tr class="table-danger">
+      <td class="text-nowrap">{{ h.date.strftime('%m-%d %H:%M:%S') }}</td><td>{{ member(h.user_id) }}</td>
+      <td>{% if h.challenge_id %}{{ challenge(h.challenge_id) }}{% else %}&mdash;{% endif %}</td>
+      <td><code class="small">{{ h.flag }}</code></td><td>{{ h.ip }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="text-muted">No honeypot flag submitted.</p>{% endif %}
 
   {{ section('Flag sharing', data.copied | length + data.sources | length, 'sharing') }}
   {% if data.copied or data.sources %}

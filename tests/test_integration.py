@@ -3,8 +3,14 @@ from datetime import datetime, timedelta
 import pytest
 
 from CTFd.models import Flags, Teams, Users, db
-from CTFd.plugins.warden import accounts, blocks, fastsolves, settings, sharing
-from CTFd.plugins.warden.models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
+from CTFd.plugins.warden import accounts, blocks, fastsolves, honeypots, settings, sharing
+from CTFd.plugins.warden.models import (
+    ClientEvent,
+    DeviceSession,
+    FlagShare,
+    HoneypotHit,
+    LockoutEvent,
+)
 from CTFd.utils.security.auth import generate_user_token
 from tests.helpers import (
     create_ctfd,
@@ -353,6 +359,7 @@ def test_admin_pages_render_and_save(app):
             "/admin/warden/sharing",
             "/admin/warden/fast-solves",
             "/admin/warden/accounts",
+            "/admin/warden/honeypots",
         ):
             assert client.get(path).status_code == 200, path
 
@@ -397,6 +404,7 @@ def test_admin_pages_are_admin_only(app):
             "/admin/warden/sharing",
             "/admin/warden/fast-solves",
             "/admin/warden/accounts",
+            "/admin/warden/honeypots",
             "/admin/warden/accounts/1",
         ):
             assert client.get(path).status_code in (302, 403), path
@@ -638,3 +646,82 @@ def test_player_pages_in_users_mode(app):
         assert page.count(b"bob") >= 1 and b"Members:" not in page
         page = client.get("/admin/warden/devices?player=ali").data
         assert f"/admin/warden/accounts/{alice}".encode() in page
+
+
+def test_honeypot_flags_record_whoever_submits_them(teams_app):
+    app = teams_app
+    with app.app_context():
+        ids = {}
+        for team_name, member in (("Redteam", "r1"), ("Blueteam", "b1")):
+            team = gen_team(db, name=team_name, email=f"{team_name}@example.test", member_count=0)
+            ids[team_name] = team.id
+            ids[member] = gen_user(
+                db, name=member, email=f"{member}@example.test", team_id=team.id, verified=True
+            ).id
+        web = gen_challenge(db, name="Webby").id
+        gen_flag(db, challenge_id=web, content="flag{real_web}")
+        pwn = gen_challenge(db, name="Pwny").id
+        gen_flag(db, challenge_id=pwn, content="flag{real_pwn}")
+        assert honeypots.add("flag{decoy_anywhere}", None, "comment in index.html")
+        assert honeypots.add("flag{decoy_pwn_only}", pwn, "strings in the binary")
+        assert not honeypots.add("flag{decoy_anywhere}", None), "duplicates are refused"
+    with login_as_user(app, name="r1") as client:
+        assert submit(client, web, "flag{decoy_anywhere}") == "incorrect"
+        assert submit(client, web, "  flag{decoy_anywhere}  ") == "incorrect"
+    with login_as_user(app, name="b1") as client:
+        assert submit(client, web, "flag{decoy_pwn_only}") == "incorrect"
+        assert submit(client, web, "flag{real_web}") == "correct"
+        assert submit(client, pwn, "flag{decoy_pwn_only}") == "incorrect"
+    with app.app_context():
+        hits = [(h.team_id, h.user_id, h.challenge_id, h.flag) for h in HoneypotHit.query.order_by(HoneypotHit.id)]
+        assert hits == [
+            (ids["Redteam"], ids["r1"], web, "flag{decoy_anywhere}"),
+            (ids["Redteam"], ids["r1"], web, "flag{decoy_anywhere}"),
+            (ids["Blueteam"], ids["b1"], pwn, "flag{decoy_pwn_only}"),
+        ], "a challenge-specific decoy only fires on its challenge, real flags never fire"
+        assert accounts.summary()[ids["Redteam"]]["honeypots"] == 2
+        blocks.add_block(pwn, f"t{ids['Redteam']}")
+    with login_as_user(app, name="r1") as client:
+        client.post(
+            "/api/v1/challenges/attempt",
+            json={"challenge_id": pwn, "submission": "flag{decoy_pwn_only}"},
+            headers=BROWSER,
+        )
+    with app.app_context():
+        assert HoneypotHit.query.count() == 4, "recorded even on a challenge the team is blocked from"
+        settings.set_enabled("honeypot_flags", False)
+    with login_as_user(app, name="b1") as client:
+        submit(client, web, "flag{decoy_anywhere}")
+    with app.app_context():
+        assert HoneypotHit.query.count() == 4, "nothing is recorded while the feature is off"
+
+
+def test_honeypot_admin_page(teams_app):
+    app = teams_app
+    with app.app_context():
+        team = gen_team(db, name="Greenteam", email="green@example.test", member_count=0)
+        green = team.id
+        gen_user(db, name="g1", email="g1@example.test", team_id=green, verified=True)
+        chal = gen_challenge(db, name="Cryptic").id
+    with login_as_user(app, name="admin") as client:
+        r = client.post(
+            "/admin/warden/honeypots",
+            data={"nonce": nonce(client), "action": "add-honeypot", "flag": "flag{trap}", "challenge_id": "", "note": "hidden div"},
+        )
+        assert b"Honeypot flag added" in r.data and b"flag{trap}" in r.data and b"hidden div" in r.data
+    with login_as_user(app, name="g1") as client:
+        assert submit(client, chal, "flag{trap}") == "incorrect"
+    with login_as_user(app, name="admin") as client:
+        page = client.get("/admin/warden/honeypots").data
+        assert b"Greenteam" in page and b"g1" in page and b"Cryptic" in page
+        assert b"Nobody has submitted" in client.get("/admin/warden/honeypots?team=nobody").data
+        page = client.get(f"/admin/warden/accounts/{green}").data
+        assert b"Honeypot flags" in page and b"flag{trap}" in page
+        assert b"Greenteam" in client.get("/admin/warden/accounts").data
+        with app.app_context():
+            honeypot_id = honeypots.load()[0]["id"]
+        r = client.post(
+            "/admin/warden/honeypots",
+            data={"nonce": nonce(client), "action": "remove-honeypot", "id": honeypot_id},
+        )
+        assert b"Honeypot flag removed" in r.data and b"No decoy flag yet" in r.data

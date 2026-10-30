@@ -6,10 +6,10 @@ from flask import render_template, request
 from CTFd.models import Challenges, Flags, Teams, Tokens, Users, db
 from CTFd.utils.decorators import admins_only
 
-from . import accounts, blocks, fastsolves, settings, sharing
+from . import accounts, blocks, fastsolves, honeypots, settings, sharing
 from .common import blueprint, handle_removal, teams_mode, template
 from .filters import Filters
-from .models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
+from .models import ClientEvent, DeviceSession, FlagShare, HoneypotHit, LockoutEvent
 
 
 def _feature_rows():
@@ -500,6 +500,61 @@ def fast_solves():
     )
 
 
+@blueprint.route("/admin/warden/honeypots", methods=["GET", "POST"])
+@admins_only
+def honeypot_flags():
+    message = None
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "add-honeypot":
+            challenge_id = _int(request.form.get("challenge_id"))
+            if challenge_id is not None and not Challenges.query.filter_by(id=challenge_id).first():
+                challenge_id = None
+            added = honeypots.add(
+                request.form.get("flag"), challenge_id, request.form.get("note")
+            )
+            message = "Honeypot flag added." if added else "Not added: empty or already listed."
+        elif action == "remove-honeypot":
+            honeypots.remove(_int(request.form.get("id")))
+            message = "Honeypot flag removed."
+        else:
+            message = handle_removal(HoneypotHit)
+
+    filters = Filters()
+    query = filters.query(
+        HoneypotHit.query,
+        users=(HoneypotHit.user_id,),
+        teams=(HoneypotHit.team_id,),
+        challenges=(HoneypotHit.challenge_id,),
+        ips=(HoneypotHit.ip,),
+    )
+    pagination = query.order_by(HoneypotHit.date.desc()).paginate(
+        page=max(1, request.args.get("page", 1, type=int)), per_page=100, error_out=False
+    )
+    hits = pagination.items
+    items = honeypots.load()
+    notes = {}
+    for item in items:
+        notes.setdefault(item["flag"], item["note"])
+    challenges = Challenges.query.order_by(Challenges.category, Challenges.name).all()
+    return render_template(
+        template("admin_honeypots.html"),
+        enabled=settings.enabled("honeypot_flags"),
+        message=message,
+        honeypots=items,
+        notes=notes,
+        challenges=challenges,
+        names={c.id: c.name for c in challenges},
+        hits=hits,
+        users=_lookup(Users, {h.user_id for h in hits}),
+        teams=_lookup(Teams, {h.team_id for h in hits}),
+        total=pagination.total,
+        pagination=pagination,
+        teams_mode=teams_mode(),
+        filters=filters,
+    )
+
+
 @blueprint.route("/admin/warden/accounts")
 @admins_only
 def accounts_list():
@@ -550,7 +605,7 @@ def account(account_id):
     data = accounts.detail(account_id)
 
     user_ids = {m.id for m in data["members"]}
-    user_ids |= {e.user_id for e in data["events"] + data["lockouts"]}
+    user_ids |= {e.user_id for e in data["events"] + data["lockouts"] + data["honeypots"]}
     user_ids |= {i for e in data["copied"] + data["sources"] for i in (e.user_id, e.owner_user_id)}
     user_ids |= {b["user_id"] for b in data["bursts"]}
     user_ids |= {u for d in data["devices"] for u in d["users"]}

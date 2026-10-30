@@ -11,7 +11,7 @@ from CTFd.plugins import (
 from CTFd.plugins.migrations import upgrade
 from CTFd.utils.user import authed, get_current_user, is_admin
 
-from . import activity, admin, blocks, devices, lockout, privacy, settings, sharing
+from . import activity, admin, blocks, devices, honeypots, lockout, privacy, settings, sharing
 from .common import ASSETS, PLUGIN_NAME, blueprint, request_path, teams_mode, template, user_url
 
 log = logging.getLogger("warden")
@@ -28,6 +28,8 @@ def _before_request():
     if user is None:
         return None
 
+    if on("honeypot_flags"):
+        honeypots.before_request(path, user)
     blocked = blocks.before_request(path, user)
     if blocked is not None:
         return blocked

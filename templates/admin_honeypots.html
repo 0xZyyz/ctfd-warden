@@ -1,0 +1,84 @@
+{% extends "admin/base.html" %}
+{% from warden_filters import filter_bar with context %}
+
+{% macro nonce(action) -%}
+<input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="{{ action }}">
+{%- endmacro %}
+
+{% block content %}
+<div class="jumbotron">
+  <div class="container">
+    <h1>Honeypots</h1>
+    <p>Decoy flags that only a cheater would submit</p>
+  </div>
+</div>
+<div class="container">
+  {% include warden_nav %}
+  {% if not enabled %}<div class="alert alert-secondary">Honeypot flags are off. Turn them on from the Overview tab.</div>{% endif %}
+  {% if message %}<div class="alert alert-info" role="status">{{ message }}</div>{% endif %}
+
+  <p>
+    Plant a fake flag where a legitimate solver would never take it from: a comment in a web page, a decoy string in a binary,
+    hidden text in a challenge description that AI agents read, or a file you share only with someone you suspect.
+    Anyone who submits it is recorded here and on their {{ 'team' if teams_mode else 'player' }} page. They only see the
+    usual "incorrect", so they do not know they were caught.
+  </p>
+  <p class="text-muted">A decoy flag must never be a valid flag of any challenge. Matching is exact, after trimming spaces.</p>
+
+  <h3>Decoy flags</h3>
+  <form method="POST" class="form-inline mb-3">
+    {{ nonce('add-honeypot') }}
+    <label class="sr-only" for="honeypot-flag">Decoy flag</label>
+    <input class="form-control mr-2 mb-2" style="width:20em" id="honeypot-flag" name="flag" placeholder="flag{decoy_...}" maxlength="255" required>
+    <label class="sr-only" for="honeypot-challenge">Challenge</label>
+    <select class="form-control mr-2 mb-2" id="honeypot-challenge" name="challenge_id">
+      <option value="">Any challenge</option>
+      {% for c in challenges %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+    </select>
+    <label class="sr-only" for="honeypot-note">Where it is planted</label>
+    <input class="form-control mr-2 mb-2" style="width:16em" id="honeypot-note" name="note" placeholder="Where it is planted (optional)" maxlength="200">
+    <button type="submit" class="btn btn-primary mb-2">Add</button>
+  </form>
+  {% if honeypots %}
+  <div class="table-responsive"><table class="table table-sm mb-5">
+    <thead><tr><th>Decoy flag</th><th>Challenge</th><th>Where it is planted</th><th></th></tr></thead>
+    <tbody>{% for h in honeypots %}<tr>
+      <td><code>{{ h.flag }}</code></td>
+      <td>{{ names.get(h.challenge_id, 'Any challenge') if h.challenge_id else 'Any challenge' }}</td>
+      <td class="text-muted">{{ h.note or '—' }}</td>
+      <td class="text-right"><form method="POST" class="d-inline">{{ nonce('remove-honeypot') }}<input type="hidden" name="id" value="{{ h.id }}"><button type="submit" class="btn btn-sm btn-outline-secondary py-0">Remove</button></form></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}
+  <p class="text-muted mb-5">No decoy flag yet.</p>
+  {% endif %}
+
+  {{ filter_bar(filters, 'warden.honeypot_flags', 'Filter hits') }}
+  <h3>Hits <span class="text-muted h5">({{ total }})</span></h3>
+  <div class="table-responsive"><table class="table table-hover">
+    <thead><tr><th>Time (UTC)</th><th>{{ 'Team / player' if teams_mode else 'Player' }}</th><th>Challenge</th><th>Decoy flag</th><th>IP</th><th></th></tr></thead>
+    <tbody>{% for h in hits %}<tr class="table-danger">
+      <td class="text-nowrap">{{ h.date.strftime('%m-%d %H:%M:%S') }}</td>
+      <td>
+        {% if teams_mode %}{% if h.team_id in teams %}<a href="{{ url_for('warden.account', account_id=h.team_id) }}">{{ teams[h.team_id].name }}</a>{% else %}No team{% endif %}
+        <small class="d-block">{% if h.user_id in users %}<a class="text-muted" href="{{ warden_user_url(h.user_id) }}">{{ users[h.user_id].name }}</a>{% else %}Deleted player{% endif %}</small>
+        {% else %}{% if h.user_id in users %}<a href="{{ warden_user_url(h.user_id) }}">{{ users[h.user_id].name }}</a>{% else %}Deleted player{% endif %}{% endif %}
+      </td>
+      <td>{% if h.challenge_id in names %}<a href="{{ url_for('admin.challenges_detail', challenge_id=h.challenge_id) }}">{{ names[h.challenge_id] }}</a>{% else %}&mdash;{% endif %}</td>
+      <td><code class="small">{{ h.flag }}</code>{% if notes.get(h.flag) %}<small class="d-block text-muted">{{ notes[h.flag] }}</small>{% endif %}</td>
+      <td>{{ h.ip or '—' }}</td>
+      <td><form method="POST" class="d-inline">{{ nonce('remove') }}<input type="hidden" name="id" value="{{ h.id }}"><button type="submit" class="btn btn-sm btn-outline-secondary py-0">Remove</button></form></td>
+    </tr>{% else %}<tr><td colspan="6" class="text-muted">Nobody has submitted a decoy flag.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if pagination.pages > 1 %}
+  <nav class="d-flex align-items-center my-3" aria-label="Pagination">
+    {% if pagination.has_prev %}<a class="btn btn-sm btn-outline-secondary mr-3" href="{{ url_for('warden.honeypot_flags', page=pagination.prev_num, **filters.args()) }}">Previous</a>{% endif %}
+    <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.has_next %}<a class="btn btn-sm btn-outline-secondary ml-3" href="{{ url_for('warden.honeypot_flags', page=pagination.next_num, **filters.args()) }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+  {% if hits %}
+  <form method="POST" class="mt-3 mb-5" onsubmit="return confirm('Remove every honeypot hit?');">{{ nonce('clear') }}<button type="submit" class="btn btn-sm btn-outline-danger">Clear all hits</button></form>
+  {% endif %}
+</div>
+{% endblock %}

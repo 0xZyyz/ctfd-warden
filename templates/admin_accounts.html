@@ -26,7 +26,7 @@
         {% if row.account.hidden %}<span class="badge badge-secondary">hidden</span>{% endif %}
       </td>
       {% for key, label in columns %}{% set n = row.counts.get(key, 0) %}
-      <td class="text-center">{% if n %}<span class="badge {{ 'badge-danger' if key in ('shared_flags', 'devices') else 'badge-warning' if key in ('bursts', 'lockouts', 'flag_sources', 'blocks') else 'badge-secondary' }}">{{ n }}</span>{% else %}<span class="text-muted">&middot;</span>{% endif %}</td>
+      <td class="text-center">{% if n %}<span class="badge {{ 'badge-danger' if key in ('honeypots', 'shared_flags', 'devices') else 'badge-warning' if key in ('bursts', 'lockouts', 'flag_sources', 'blocks') else 'badge-secondary' }}">{{ n }}</span>{% else %}<span class="text-muted">&middot;</span>{% endif %}</td>
       {% endfor %}
     </tr>{% else %}<tr><td colspan="{{ columns | length + 1 }}" class="text-muted">{{ 'No match.' if filters.active else 'Nothing found yet.' }}</td></tr>{% endfor %}</tbody>
   </table></div>

@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Honeypot flags: decoy flags (for any challenge or one challenge) that record every player who
+  submits them, on a new Honeypots page, the team pages and the Teams ranking.
+
 ## [1.0.0] - 2026-10-30
 
 First public release.

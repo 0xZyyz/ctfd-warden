@@ -28,6 +28,11 @@ FEATURES = {
         "Flag sharing",
         "On challenges you mark as having unique flags, report the same flag submitted by two teams.",
     ),
+    "honeypot_flags": (
+        True,
+        "Honeypot flags",
+        "Record every player who submits one of your decoy flags.",
+    ),
     "team_privacy": (
         False,
         "Team privacy",
