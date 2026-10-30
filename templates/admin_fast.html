@@ -1,0 +1,75 @@
+{% extends "admin/base.html" %}
+
+{% macro account(team_id, user_id) -%}
+{% if teams_mode and team_id in teams %}<a href="{{ url_for('admin.teams_detail', team_id=team_id) }}">{{ teams[team_id].name }}</a>{% elif teams_mode %}Deleted team{% endif %}
+{%- if user_id in users %}<small class="d-block text-muted"><a class="text-muted" href="{{ url_for('admin.users_detail', user_id=user_id) }}">{{ users[user_id].name }}</a></small>{% elif not teams_mode %}Deleted user{% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="jumbotron">
+  <div class="container">
+    <h1>Fast solves</h1>
+    <p>Challenges solved too soon after the {{ 'team' if teams_mode else 'player' }} first opened them</p>
+  </div>
+</div>
+<div class="container">
+  {% include warden_nav %}
+  {% if not enabled %}<div class="alert alert-secondary">Fast solve tracking is off. Turn it on from the Overview tab.</div>{% endif %}
+  {% if message %}<div class="alert alert-info" role="status">{{ message }}</div>{% endif %}
+
+  <p>
+    Warden records the first time each {{ 'team' if teams_mode else 'player' }} opens a challenge. A solve that comes only
+    seconds later usually means the flag came from somewhere else. A solve of a challenge the
+    {{ 'team' if teams_mode else 'player' }} never opened means the flag was sent straight to the API.
+  </p>
+  <p class="text-muted">
+    {% if since %}Opens are recorded since {{ since.strftime('%Y-%m-%d %H:%M') }} UTC; earlier solves are not checked.{% else %}Opens are not recorded yet.{% endif %}
+    Install Warden before the event starts so every open is recorded.
+  </p>
+
+  <form method="POST" class="mb-5">
+    <input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="fast-settings">
+    <div class="form-inline mb-3">
+      <label class="mr-2" for="fast-seconds">Report solves within</label>
+      <input type="number" min="5" max="86400" class="form-control mr-2" style="width:7em" id="fast-seconds" name="seconds" value="{{ seconds }}">
+      <label>seconds of the first open.</label>
+    </div>
+    {% if challenges %}
+    <details class="mb-3">
+      <summary>Ignored challenges ({{ challenges | selectattr('ignored') | list | length }})</summary>
+      <p class="text-muted small mt-2">Tick challenges that are meant to be solved instantly, such as a welcome or sanity check flag.</p>
+      <div class="table-responsive"><table class="table table-sm">
+        <thead><tr><th style="width:3em">Ignore</th><th>Challenge</th><th>Category</th></tr></thead>
+        <tbody>{% for c in challenges %}<tr>
+          <td><input type="checkbox" name="ignore" value="{{ c.id }}" aria-label="Ignore {{ c.name }}" {% if c.ignored %}checked{% endif %}></td>
+          <td>{{ c.name }}</td>
+          <td class="text-muted">{{ c.category }}</td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">Save</button>
+  </form>
+
+  <h3>Fast solves <span class="text-muted h5">({{ total }})</span></h3>
+  <div class="table-responsive"><table class="table table-hover">
+    <thead><tr><th>Solved (UTC)</th><th>Challenge</th><th>{{ 'Team' if teams_mode else 'Player' }}</th><th>First opened</th><th>Time to solve</th><th>Median for this challenge</th><th>IP</th></tr></thead>
+    <tbody>{% for r in rows %}{% set s = r.solve %}<tr>
+      <td class="text-nowrap">{{ s.date.strftime('%m-%d %H:%M:%S') }}</td>
+      <td>{% if s.challenge_id in names %}<a href="{{ url_for('admin.challenges_detail', challenge_id=s.challenge_id) }}">{{ names[s.challenge_id] }}</a>{% else %}#{{ s.challenge_id }}{% endif %}</td>
+      <td>{{ account(s.team_id, s.user_id) }}</td>
+      <td class="text-nowrap">{{ r.opened.strftime('%m-%d %H:%M:%S') if r.opened else '—' }}</td>
+      <td>{% if r.seconds is none %}<span class="badge badge-danger">never opened</span>{% else %}<span class="badge badge-warning">{{ duration(r.seconds) }}</span>{% endif %}</td>
+      <td class="text-muted">{{ duration(r.median) if r.median is not none else '—' }}</td>
+      <td>{{ s.ip or '—' }}</td>
+    </tr>{% else %}<tr><td colspan="7" class="text-muted">No fast solves found.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if pages > 1 %}
+  <nav class="d-flex align-items-center my-3" aria-label="Pagination">
+    {% if page > 1 %}<a class="btn btn-sm btn-outline-secondary mr-3" href="{{ url_for('warden.fast_solves', page=page - 1) }}">Previous</a>{% endif %}
+    <span>Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a class="btn btn-sm btn-outline-secondary ml-3" href="{{ url_for('warden.fast_solves', page=page + 1) }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

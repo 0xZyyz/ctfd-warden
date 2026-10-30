@@ -28,6 +28,11 @@ FEATURES = {
         "Flag sharing",
         "On challenges you mark as having unique flags, report the same flag submitted by two teams.",
     ),
+    "fast_solves": (
+        True,
+        "Fast solves",
+        "Record when each team first opens a challenge and list solves that came too soon after.",
+    ),
     "team_privacy": (
         False,
         "Team privacy",

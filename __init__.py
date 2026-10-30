@@ -11,7 +11,18 @@ from CTFd.plugins import (
 from CTFd.plugins.migrations import upgrade
 from CTFd.utils.user import authed, get_current_user, is_admin
 
-from . import activity, admin, blocks, brackets, devices, lockout, privacy, settings, sharing
+from . import (
+    activity,
+    admin,
+    blocks,
+    brackets,
+    devices,
+    fastsolves,
+    lockout,
+    privacy,
+    settings,
+    sharing,
+)
 from .common import ASSETS, PLUGIN_NAME, blueprint, request_path, template
 
 log = logging.getLogger("warden")
@@ -43,6 +54,8 @@ def _before_request():
             return locked
     if on("flag_sharing"):
         sharing.before_request(path, user)
+    if on("fast_solves"):
+        fastsolves.before_request(path, user)
     return None
 
 
@@ -62,6 +75,8 @@ def _after_request(response):
             lockout.after_request(response)
         if on("flag_sharing"):
             sharing.after_request(response)
+        if on("fast_solves"):
+            fastsolves.after_request(response)
         if on("device_tracking"):
             devices.after_request(response)
         if on("regional_brackets"):
@@ -80,6 +95,8 @@ def load(app):
     with app.app_context():
         if settings.enabled("regional_brackets"):
             brackets.ensure_brackets()
+        if settings.enabled("fast_solves"):
+            fastsolves.start_tracking()
         lockout.warn_without_redis()
     app.before_request(_before_request)
     app.after_request(_after_request)

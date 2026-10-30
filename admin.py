@@ -6,7 +6,7 @@ from flask import render_template, request
 from CTFd.models import Brackets, Challenges, Flags, Teams, Tokens, Users, db
 from CTFd.utils.decorators import admins_only
 
-from . import blocks, brackets, settings, sharing
+from . import blocks, brackets, fastsolves, settings, sharing
 from .common import blueprint, handle_removal, teams_mode, template
 from .models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
 
@@ -45,11 +45,14 @@ def _account_label(key):
 def _handle_post():
     action = request.form.get("action")
     if action == "features":
+        was_tracking = settings.enabled("fast_solves")
         for name in settings.FEATURES:
             if settings.env_override(name) is None:
                 settings.set_enabled(name, request.form.get(name) == "on")
         if settings.enabled("regional_brackets"):
             brackets.ensure_brackets()
+        if settings.enabled("fast_solves") and not was_tracking:
+            fastsolves.start_tracking(reset=True)
         return "Features saved."
     if action == "lock-settings":
         values = {k: _int(request.form.get(k)) for k in settings.LOCK_DEFAULTS}
@@ -385,4 +388,69 @@ def flag_sharing():
         total=pagination.total,
         pagination=pagination,
         teams_mode=teams_mode(),
+    )
+
+
+def _duration(seconds):
+    if seconds is None:
+        return ""
+    hours, rest = divmod(int(seconds), 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours} h {minutes} min"
+    if minutes:
+        return f"{minutes} min {secs} s"
+    return f"{secs} s"
+
+
+@blueprint.route("/admin/warden/fast-solves", methods=["GET", "POST"])
+@admins_only
+def fast_solves():
+    message = None
+    if request.method == "POST" and request.form.get("action") == "fast-settings":
+        seconds = _int(request.form.get("seconds"))
+        if seconds is None or not fastsolves.MIN_SECONDS <= seconds <= fastsolves.MAX_SECONDS:
+            message = (
+                f"Not saved: the time must be between {fastsolves.MIN_SECONDS} and "
+                f"{fastsolves.MAX_SECONDS} seconds."
+            )
+        else:
+            ids = {int(c) for c in request.form.getlist("ignore") if c.isdigit()}
+            known = {c for (c,) in db.session.query(Challenges.id).filter(Challenges.id.in_(ids))}
+            fastsolves.save_threshold(seconds)
+            fastsolves.save_ignored(known)
+            message = "Fast solve settings saved."
+
+    found = fastsolves.rows()
+    per_page = 100
+    pages = max(1, -(-len(found) // per_page))
+    page = min(pages, max(1, request.args.get("page", 1, type=int)))
+    shown = found[(page - 1) * per_page : page * per_page]
+
+    ignored = fastsolves.ignored()
+    challenges = [
+        {"id": c.id, "name": c.name, "category": c.category, "ignored": c.id in ignored}
+        for c in Challenges.query.order_by(Challenges.category, Challenges.name).all()
+    ]
+    names = {c["id"]: c["name"] for c in challenges}
+    user_ids = {r["solve"].user_id for r in shown if r["solve"].user_id}
+    team_ids = {r["solve"].team_id for r in shown if r["solve"].team_id}
+    users = {u.id: u for u in Users.query.filter(Users.id.in_(user_ids)).all()} if user_ids else {}
+    teams = {t.id: t for t in Teams.query.filter(Teams.id.in_(team_ids)).all()} if team_ids else {}
+    return render_template(
+        template("admin_fast.html"),
+        enabled=settings.enabled("fast_solves"),
+        message=message,
+        seconds=fastsolves.threshold(),
+        since=fastsolves.since(),
+        challenges=challenges,
+        names=names,
+        rows=shown,
+        total=len(found),
+        page=page,
+        pages=pages,
+        users=users,
+        teams=teams,
+        teams_mode=teams_mode(),
+        duration=_duration,
     )
