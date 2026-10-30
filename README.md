@@ -24,7 +24,6 @@ Every feature can be switched on or off from **Admin → Warden**, without a res
 | **Fast solves** | always available | Lists players who solved several challenges in a short time, by default 3 within 2 minutes, with the challenges and times. It reads CTFd's own solves, so it also works on a finished event. The numbers are configurable, and challenges meant to be instant, like a welcome flag, can be ignored. |
 | **Challenge blocks** | always available | Bar one team or user from one challenge, e.g. after revoking a solve for flag sharing. The challenge disappears from their list and submissions are refused. |
 | **Team privacy** | off | Hides team rosters, member countries and the user list from other players. Admins and the team itself still see everything. |
-| **Regional brackets** | off | Places each team (or user, in users mode) in a regional bracket such as *MENA* / *Outside MENA* from members' nationalities. Bracket names and country list are configurable; manual admin choices are kept. |
 
 ![Client activity](docs/screenshots/client-activity.png)
 
@@ -86,7 +85,6 @@ as locked on the admin page.
 | `WARDEN_FLAG_LOCKOUT` | Flag brute-force lockout |
 | `WARDEN_FLAG_SHARING` | Flag sharing |
 | `WARDEN_TEAM_PRIVACY` | Team privacy |
-| `WARDEN_REGIONAL_BRACKETS` | Regional brackets |
 
 Use `1`/`0` (or `true`/`false`, `on`/`off`). Unset means the admin page decides.
 
@@ -103,17 +101,6 @@ Flag sharing can only be detected when teams get **different** flags. Two common
 Then tick the challenge on **Admin → Warden → Flag sharing**. Warden compares every submission on
 watched challenges, accepted or not, with the earlier correct submissions of other teams.
 
-### Regional brackets
-
-When this is on, Warden creates two brackets for the current user mode and places every team in
-the region bracket only when **all** its members have a nationality from the country list. A
-missing nationality counts as outside. Players set their nationality in
-**Settings → Profile → Country**.
-
-CTFd still shows its bracket dropdown when a team is created; whatever players pick, Warden
-places the team again right after. A bracket an admin sets by hand on a team is kept until it is
-reset on the Warden page.
-
 ## Data Warden stores
 
 Tell your players about it, for example in your rules. All of it can be deleted from the admin
@@ -125,7 +112,7 @@ pages.
 | Random device ID, user, last IP, User-Agent, first and last seen | `warden_device_sessions` + `warden_device` cookie (HttpOnly, 1 year) | Shared devices |
 | Lockouts: time, team, user, challenge, IP, attempt count | `warden_lockout_events` | Flag lockout |
 | Shared flags: challenge, flag, both teams and players, result, IP, time | `warden_flag_shares` | Flag sharing |
-| Settings, challenge blocks, manual brackets, fast solve limits | CTFd's `config` table, keys `warden_*` | Configuration |
+| Settings, challenge blocks, fast solve limits | CTFd's `config` table, keys `warden_*` | Configuration |
 
 Ordinary browser requests are never logged. Warden sends nothing to third parties.
 

@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from CTFd.models import Brackets, Flags, Teams, Users, db
-from CTFd.plugins.warden import blocks, brackets, fastsolves, settings, sharing
+from CTFd.models import Flags, Teams, Users, db
+from CTFd.plugins.warden import blocks, fastsolves, settings, sharing
 from CTFd.plugins.warden.models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
 from CTFd.utils.security.auth import generate_user_token
 from tests.helpers import (
@@ -196,38 +196,6 @@ def test_device_cookie_links_accounts_on_one_browser(app):
         page = client.get("/admin/warden/devices")
         assert page.status_code == 200
         assert b"alice" in page.data and b"bob" in page.data
-
-
-def test_regional_brackets_follow_member_nationalities(teams_app):
-    app = teams_app
-    with app.app_context():
-        settings.set_enabled("regional_brackets", True)
-        local = gen_team(db, name="Local", email="local@example.test", member_count=0)
-        mixed = gen_team(db, name="Mixed", email="mixed@example.test", member_count=0)
-        gen_user(db, name="a", email="a@example.test", team_id=local.id, country="TN")
-        gen_user(db, name="b", email="b@example.test", team_id=local.id, country="EG")
-        gen_user(db, name="c", email="c@example.test", team_id=mixed.id, country="TN")
-        gen_user(db, name="d", email="d@example.test", team_id=mixed.id, country="FR")
-        brackets.ensure_brackets()
-        inside, outside, _ = brackets.brackets()
-        assert Teams.query.filter_by(name="Local").one().bracket_id == inside.id
-        assert Teams.query.filter_by(name="Mixed").one().bracket_id == outside.id
-
-        settings.save_region_settings("Africa", "Rest of world", "TN EG")
-        brackets.ensure_brackets(old_names=("MENA", "Outside MENA"))
-        names = {b.name for b in Brackets.query.filter_by(type="teams")}
-        assert names == {"Africa", "Rest of world"}
-        assert Teams.query.filter_by(name="Local").one().bracket.name == "Africa"
-        mixed_id = Teams.query.filter_by(name="Mixed").one().id
-        africa = Brackets.query.filter_by(name="Africa").one().id
-
-    with login_as_user(app, name="admin") as client:
-        r = client.patch(f"/api/v1/teams/{mixed_id}", json={"bracket_id": africa})
-        assert r.status_code == 200
-    with app.app_context():
-        assert brackets.overrides() == {f"t{mixed_id}": africa}
-        brackets.classify_all()
-        assert Teams.query.get(mixed_id).bracket_id == africa
 
 
 def test_team_privacy_hides_rosters_and_user_list(teams_app):
@@ -441,7 +409,6 @@ def test_admin_pages_survive_deleted_accounts(app):
     with login_as_user(app, name="admin") as client:
         assert client.get("/admin/warden/activity").status_code == 200
         assert client.get("/admin/warden").status_code == 200
-
 
 
 def solve_at(user_id, challenge_id, when, team_id=None):

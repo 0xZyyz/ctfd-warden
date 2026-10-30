@@ -11,7 +11,7 @@ from CTFd.plugins import (
 from CTFd.plugins.migrations import upgrade
 from CTFd.utils.user import authed, get_current_user, is_admin
 
-from . import activity, admin, blocks, brackets, devices, lockout, privacy, settings, sharing
+from . import activity, admin, blocks, devices, lockout, privacy, settings, sharing
 from .common import ASSETS, PLUGIN_NAME, blueprint, request_path, template
 
 log = logging.getLogger("warden")
@@ -22,8 +22,6 @@ def _before_request():
     path = request_path()
     if on("team_privacy"):
         privacy.before_request(path)
-    if on("regional_brackets"):
-        brackets.before_request(path)
     if not authed() or is_admin():
         return None
     user = get_current_user()
@@ -64,8 +62,6 @@ def _after_request(response):
             sharing.after_request(response)
         if on("device_tracking"):
             devices.after_request(response)
-        if on("regional_brackets"):
-            brackets.after_request(path, response)
     except Exception:
         log.exception("warden: after_request hook failed for %s", request.path)
         db.session.rollback()
@@ -78,8 +74,6 @@ def load(app):
     register_plugin_assets_directory(app, base_path=ASSETS)
     register_plugin_script(ASSETS + "warden.js")
     with app.app_context():
-        if settings.enabled("regional_brackets"):
-            brackets.ensure_brackets()
         lockout.warn_without_redis()
     app.before_request(_before_request)
     app.after_request(_after_request)

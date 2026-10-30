@@ -17,7 +17,6 @@ sharing.py               flag sharing (same unique flag from two accounts)
 fastsolves.py            fast solves (several solves by one player in a short time)
 blocks.py                per-account challenge blocks
 privacy.py               team privacy response filtering
-brackets.py              regional brackets
 admin.py                 the admin pages
 models.py, migrations/   database tables (alembic, run by CTFd on startup)
 templates/, assets/      admin page templates and the automation-signal script
@@ -30,7 +29,7 @@ scripts/test-docker.sh   runs the suite in the official ctfd/ctfd image (develop
 ```sh
 scripts/test-docker.sh                      # CTFd 3.8.9
 CTFD_VERSION=3.8.0 scripts/test-docker.sh   # another release
-scripts/test-docker.sh -k brackets -x       # pass pytest arguments through
+scripts/test-docker.sh -k lockout -x        # pass pytest arguments through
 ```
 
 The script mounts the repository as `CTFd/plugins/warden` and `tests/` as CTFd's `tests/warden`

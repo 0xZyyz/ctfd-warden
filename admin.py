@@ -3,10 +3,10 @@ from datetime import datetime
 import sqlalchemy as sa
 from flask import render_template, request
 
-from CTFd.models import Brackets, Challenges, Flags, Teams, Tokens, Users, db
+from CTFd.models import Challenges, Flags, Teams, Tokens, Users, db
 from CTFd.utils.decorators import admins_only
 
-from . import blocks, brackets, fastsolves, settings, sharing
+from . import blocks, fastsolves, settings, sharing
 from .common import blueprint, handle_removal, teams_mode, template
 from .models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
 
@@ -48,8 +48,6 @@ def _handle_post():
         for name in settings.FEATURES:
             if settings.env_override(name) is None:
                 settings.set_enabled(name, request.form.get(name) == "on")
-        if settings.enabled("regional_brackets"):
-            brackets.ensure_brackets()
         return "Features saved."
     if action == "lock-settings":
         values = {k: _int(request.form.get(k)) for k in settings.LOCK_DEFAULTS}
@@ -85,26 +83,6 @@ def _handle_post():
             _int(request.form.get("challenge_id")) or 0, request.form.get("account", "")
         )
         return "Block removed."
-    if action == "region-settings":
-        name = (request.form.get("name") or "").strip()[:64]
-        outside = (request.form.get("outside_name") or "").strip()[:64]
-        codes = settings.parse_countries(request.form.get("countries"))
-        if not name or not outside or name == outside or not codes:
-            return "Region not saved: give two different bracket names and at least one country code."
-        old = settings.region_settings()
-        settings.save_region_settings(name, outside, " ".join(codes))
-        brackets.ensure_brackets(old_names=(old["name"], old["outside_name"]))
-        return "Region saved and accounts placed again."
-    if action == "reset-brackets":
-        brackets.save_overrides({})
-        brackets.classify_all()
-        return "Every account is back to automatic placement."
-    if action == "reset-bracket":
-        pinned = brackets.overrides()
-        pinned.pop(request.form.get("account", ""), None)
-        brackets.save_overrides(pinned)
-        brackets.classify_all()
-        return "That account is back to automatic placement."
     return None
 
 
@@ -135,21 +113,6 @@ def overview():
                 }
             )
 
-    pinned_rows = []
-    if settings.enabled("regional_brackets"):
-        names = {b.id: b.name for b in Brackets.query.all()}
-        for account, bracket_id in brackets.overrides().items():
-            name, endpoint, args = _account_label(account)
-            pinned_rows.append(
-                {
-                    "account": account,
-                    "name": name,
-                    "endpoint": endpoint,
-                    "args": args,
-                    "bracket": names.get(bracket_id, "No bracket"),
-                }
-            )
-
     return render_template(
         template("admin_overview.html"),
         message=message,
@@ -160,8 +123,6 @@ def overview():
         blocks=block_rows,
         challenges=sorted(challenge_names.items(), key=lambda c: c[1].lower()),
         teams_mode=teams_mode(),
-        region=settings.region_settings(),
-        pinned=pinned_rows,
     )
 
 

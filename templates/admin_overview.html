@@ -109,43 +109,5 @@
   {% else %}
   <p class="text-muted">No challenge is blocked for anyone.</p>
   {% endif %}
-
-  {% if enabled.regional_brackets %}
-  <hr class="my-5">
-
-  <h3>Regional brackets</h3>
-  <p>
-    {{ 'Teams are' if teams_mode else 'Users are' }} placed automatically: <b>{{ region.name }}</b> when every member has a
-    nationality from the list below, <b>{{ region.outside_name }}</b> otherwise (a missing nationality counts as outside).
-    Players set their nationality in Settings &rarr; Profile &rarr; Country. A bracket you set by hand on
-    {{ 'a team' if teams_mode else 'a user' }} is kept until you reset it here.
-  </p>
-  <form method="POST" class="mb-3">
-    {{ nonce('region-settings') }}
-    <div class="form-row">
-      <div class="col-md-3 mb-2"><label for="region-name">Region bracket</label><input class="form-control" id="region-name" name="name" value="{{ region.name }}" maxlength="64" required></div>
-      <div class="col-md-3 mb-2"><label for="region-outside">Outside bracket</label><input class="form-control" id="region-outside" name="outside_name" value="{{ region.outside_name }}" maxlength="64" required></div>
-      <div class="col-md-6 mb-2"><label for="region-countries">Country codes (ISO 3166-1 alpha-2)</label><input class="form-control" id="region-countries" name="countries" value="{{ region.countries }}" required></div>
-    </div>
-    <button type="submit" class="btn btn-primary">Save region</button>
-  </form>
-  {% if pinned %}
-  <table class="table table-striped">
-    <thead><tr><th>{{ 'Team' if teams_mode else 'User' }}</th><th>Bracket set by an admin</th><th></th></tr></thead>
-    <tbody>
-      {% for row in pinned %}
-      <tr>
-        <td><a href="{{ url_for(row.endpoint, **row.args) }}">{{ row.name }}</a></td>
-        <td>{{ row.bracket }}</td>
-        <td class="text-right"><form method="POST" class="d-inline">{{ nonce('reset-bracket') }}<input type="hidden" name="account" value="{{ row.account }}"><button type="submit" class="btn btn-sm btn-outline-secondary">Back to automatic</button></form></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <form method="POST">{{ nonce('reset-brackets') }}<button type="submit" class="btn btn-outline-danger">Return everyone to automatic placement</button></form>
-  {% else %}
-  <p class="text-muted">No bracket has been set by hand; everyone is placed automatically.</p>
-  {% endif %}
-  {% endif %}
 </div>
 {% endblock %}

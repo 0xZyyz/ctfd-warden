@@ -24,7 +24,7 @@ First public release.
 - Flag sharing: report the same unique flag (instancer or per-session regex flags) submitted by
   two accounts, live and by scanning past submissions.
 - Per-account challenge blocks with an admin UI.
-- Optional team privacy filtering and optional regional brackets (teams and users modes).
+- Optional team privacy filtering.
 - Admin pages (Overview, Client activity, Shared devices, Flag sharing) and `WARDEN_*` environment
   overrides.
 - Install by cloning the repository into `CTFd/plugins/` (any folder name); works with any theme

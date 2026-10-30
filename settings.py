@@ -33,22 +33,10 @@ FEATURES = {
         "Team privacy",
         "Hide team rosters, member countries and the user list from other players.",
     ),
-    "regional_brackets": (
-        False,
-        "Regional brackets",
-        "Place every account in a regional bracket from the nationalities of its members.",
-    ),
 }
 
 LOCK_DEFAULTS = {"threshold": 60, "window": 300, "duration": 600}
 LOCK_MINIMUMS = {"threshold": 5, "window": 60, "duration": 60}
-
-MENA_COUNTRIES = "AE BH DJ DZ EG IQ IR JO KM KW LB LY MA MR OM PS QA SA SD SO SY TN YE"
-REGION_DEFAULTS = {
-    "name": "MENA",
-    "outside_name": "Outside MENA",
-    "countries": MENA_COUNTRIES,
-}
 
 
 def _key(name):
@@ -106,25 +94,3 @@ def save_lock_settings(values):
     for name, value in values.items():
         set_config(_key(f"lock_{name}"), str(int(value)))
 
-
-def region_settings():
-    out = {}
-    for name, default in REGION_DEFAULTS.items():
-        value = get_config(_key(f"region_{name}"))
-        out[name] = str(value).strip() if value else default
-    out["codes"] = parse_countries(out["countries"])
-    return out
-
-
-def save_region_settings(name, outside_name, countries):
-    set_config(_key("region_name"), name)
-    set_config(_key("region_outside_name"), outside_name)
-    set_config(_key("region_countries"), " ".join(sorted(parse_countries(countries))))
-
-
-def parse_countries(text):
-    return {
-        code.upper()
-        for code in str(text or "").replace(",", " ").split()
-        if len(code) == 2 and code.isalpha()
-    }
