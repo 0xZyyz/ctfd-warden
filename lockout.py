@@ -1,10 +1,3 @@
-"""Flag brute-force lockout: too many wrong flags on one challenge locks the account out of it.
-
-This sits on top of CTFd's own per-IP limit. The account is the team in teams mode and the user in
-users mode, so switching IPs or team members does not reset it. Counters are atomic with Redis;
-with CTFd's filesystem cache they still work but several workers can each miss a few attempts.
-"""
-
 import logging
 import time
 

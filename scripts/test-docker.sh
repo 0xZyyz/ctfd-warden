@@ -1,7 +1,4 @@
 #!/usr/bin/env sh
-# Run Warden's tests inside the official CTFd image, so nothing has to be installed locally.
-#   scripts/test-docker.sh            # CTFd 3.8.9
-#   CTFD_VERSION=3.8.0 scripts/test-docker.sh -k lockout
 set -eu
 
 CTFD_VERSION="${CTFD_VERSION:-3.8.9}"

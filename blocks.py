@@ -1,6 +1,3 @@
-"""Per-account challenge blocks: bar one team (or user) from one challenge, e.g. after revoking a
-solve for flag sharing. A blocked account no longer sees the challenge and cannot submit to it."""
-
 import json
 import re
 
@@ -16,7 +13,6 @@ CHALLENGE_DETAIL = re.compile(r"^/api/v1/challenges/(\d+)(?:/.*)?$")
 
 
 def load_blocks():
-    """{challenge_id (int): {account_key, ...}}"""
     try:
         data = json.loads(get_config(BLOCKS_KEY) or "{}")
     except (TypeError, ValueError):
@@ -85,7 +81,6 @@ def before_request(path, user):
 
 
 def after_request(path, user, response):
-    """Drop blocked challenges from the challenge list a blocked account receives."""
     if request.method != "GET" or path.rstrip("/") != "/api/v1/challenges":
         return
     if response.status_code != 200:

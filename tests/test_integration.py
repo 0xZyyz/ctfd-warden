@@ -1,5 +1,3 @@
-"""Warden against a real CTFd app. Run from a CTFd checkout: ``pytest tests/warden``."""
-
 from datetime import datetime, timedelta
 
 import pytest
@@ -55,9 +53,7 @@ def challenge_ids(client):
     return [c["id"] for c in client.get("/api/v1/challenges", headers=BROWSER).get_json()["data"]]
 
 
-# ---------------------------------------------------------------- general
 def test_players_reach_challenges_without_extra_steps(app):
-    """Warden adds no page between registration and the challenges."""
     with app.test_client() as client:
         client.get("/register")
         response = client.post(
@@ -82,7 +78,6 @@ def test_env_override_wins_over_admin_switch(app, monkeypatch):
         assert settings.env_override("flag_lockout") is False
 
 
-# ---------------------------------------------------------------- flag lockout
 def test_flag_lockout_after_threshold(app):
     user_id = player(app)
     with app.app_context():
@@ -110,7 +105,6 @@ def test_flag_lockout_after_threshold(app):
         assert event.attempts == 5
 
 
-# ---------------------------------------------------------------- challenge blocks
 def test_challenge_block_hides_and_refuses_the_challenge(app):
     user_id = player(app)
     player(app, name="other")
@@ -135,7 +129,6 @@ def test_challenge_block_hides_and_refuses_the_challenge(app):
         assert blocks.load_blocks() == {}
 
 
-# ---------------------------------------------------------------- client activity
 def test_client_activity_is_sampled_per_client(app):
     player(app)
     with login_as_user(app, name="player") as client:
@@ -183,7 +176,6 @@ def test_client_activity_switched_off_logs_nothing(app):
         assert ClientEvent.query.count() == 0
 
 
-# ---------------------------------------------------------------- shared devices
 def test_device_cookie_links_accounts_on_one_browser(app):
     player(app, name="alice")
     player(app, name="bob")
@@ -206,7 +198,6 @@ def test_device_cookie_links_accounts_on_one_browser(app):
         assert b"alice" in page.data and b"bob" in page.data
 
 
-# ---------------------------------------------------------------- regional brackets
 def test_regional_brackets_follow_member_nationalities(teams_app):
     app = teams_app
     with app.app_context():
@@ -222,7 +213,6 @@ def test_regional_brackets_follow_member_nationalities(teams_app):
         assert Teams.query.filter_by(name="Local").one().bracket_id == inside.id
         assert Teams.query.filter_by(name="Mixed").one().bracket_id == outside.id
 
-        # Renaming the region renames the brackets in place.
         settings.save_region_settings("Africa", "Rest of world", "TN EG")
         brackets.ensure_brackets(old_names=("MENA", "Outside MENA"))
         names = {b.name for b in Brackets.query.filter_by(type="teams")}
@@ -231,7 +221,6 @@ def test_regional_brackets_follow_member_nationalities(teams_app):
         mixed_id = Teams.query.filter_by(name="Mixed").one().id
         africa = Brackets.query.filter_by(name="Africa").one().id
 
-    # An admin's manual choice is kept until reset.
     with login_as_user(app, name="admin") as client:
         r = client.patch(f"/api/v1/teams/{mixed_id}", json={"bracket_id": africa})
         assert r.status_code == 200
@@ -241,7 +230,6 @@ def test_regional_brackets_follow_member_nationalities(teams_app):
         assert Teams.query.get(mixed_id).bracket_id == africa
 
 
-# ---------------------------------------------------------------- team privacy
 def test_team_privacy_hides_rosters_and_user_list(teams_app):
     app = teams_app
     with app.app_context():
@@ -264,7 +252,6 @@ def test_team_privacy_hides_rosters_and_user_list(teams_app):
         assert "members" in client.get(f"/api/v1/teams/{theirs_id}").get_json()["data"]
 
 
-# ---------------------------------------------------------------- flag sharing
 UNIQUE = r"Securinets\{dejavu_[0-9a-f]{16}\}"
 
 
@@ -306,7 +293,6 @@ def test_flag_sharing_catches_a_unique_flag_from_another_account(app):
 
 
 def test_flag_sharing_catches_rejected_submissions_too(app):
-    """An instancer rejects another team's flag; it is still reported."""
     player(app, name="alice")
     bob = player(app, name="bob")
     with app.app_context():
@@ -387,7 +373,6 @@ def test_flag_sharing_admin_page(app):
         assert sharing.watched() == {chal}
 
 
-# ---------------------------------------------------------------- admin pages
 def test_admin_pages_render_and_save(app):
     user_id = player(app)
     with app.app_context():

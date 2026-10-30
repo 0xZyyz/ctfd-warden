@@ -1,30 +1,23 @@
-"""Client telemetry labels. Headers and browser signals are hints, not proof of AI use."""
-
 import re
 
 from flask import request
 
-# Self-identifying AI agents and fetchers (substring of the User-Agent, case-insensitive) -> label.
 AI_AGENTS = [
-    # OpenAI
     ("chatgpt-user", "ChatGPT agent"),
     ("oai-searchbot", "OpenAI SearchBot"),
     ("gptbot", "GPTBot"),
     ("openai", "OpenAI"),
     ("codex", "OpenAI Codex"),
-    # Anthropic
     ("claude-user", "Claude"),
     ("claude-searchbot", "Claude"),
     ("claudebot", "ClaudeBot"),
     ("claude-web", "Claude"),
     ("anthropic", "Anthropic"),
-    # Google
     ("googleagent", "Google agent (Mariner)"),
     ("gemini", "Gemini"),
     ("google-extended", "Gemini"),
     ("google-cloudvertexbot", "Google Vertex AI"),
     ("googleother", "Google fetcher"),
-    # Perplexity / Meta / Mistral / Apple / Amazon / Microsoft
     ("perplexity", "Perplexity"),
     ("comet", "Perplexity Comet"),
     ("meta-external", "Meta AI"),
@@ -36,7 +29,6 @@ AI_AGENTS = [
     ("nova-act", "Amazon Nova Act"),
     ("copilot", "Microsoft Copilot"),
     ("bingpreview", "Bing/Copilot"),
-    # Chinese labs
     ("bytespider", "ByteDance"),
     ("tiktokspider", "ByteDance"),
     ("doubao", "Doubao"),
@@ -49,7 +41,6 @@ AI_AGENTS = [
     ("pangubot", "Huawei PanGu"),
     ("baiduspider-render", "Baidu AI"),
     ("yisouspider", "Yisou"),
-    # other assistants, agents and AI crawlers
     ("cohere", "Cohere"),
     ("duckassist", "DuckAssist"),
     ("youbot", "You.com"),
@@ -96,9 +87,7 @@ AI_AGENTS = [
     ("ai-agent", "self-declared AI agent"),
     ("ai agent", "self-declared AI agent"),
 ]
-# Scripting / headless clients -> label. Normal in a CTF; logged as context, not as proof.
 AUTOMATION = [
-    # browsers under automation
     ("webdriverio", "WebdriverIO"),
     ("nightwatch", "Nightwatch"),
     ("testcafe", "TestCafe"),
@@ -133,7 +122,6 @@ AUTOMATION = [
     ("zombie", "Zombie.js"),
     ("jsdom", "jsdom"),
     ("htmlunit", "HtmlUnit"),
-    # Python
     ("python-requests", "python-requests"),
     ("python-httpx", "httpx"),
     ("aiohttp", "aiohttp"),
@@ -144,7 +132,6 @@ AUTOMATION = [
     ("mechanize", "Mechanize"),
     ("scrapy", "Scrapy"),
     ("locust", "Locust"),
-    # JS / TS runtimes and libs
     ("node-fetch", "node-fetch"),
     ("undici", "Node undici"),
     ("node/", "Node"),
@@ -154,7 +141,6 @@ AUTOMATION = [
     ("needle/", "needle"),
     ("deno/", "Deno"),
     ("bun/", "Bun"),
-    # other languages
     ("go-http-client", "Go"),
     ("reqwest", "Rust reqwest"),
     ("hyper/", "Rust hyper"),
@@ -183,7 +169,6 @@ AUTOMATION = [
     ("httpoison", "Elixir"),
     ("hackney", "Elixir"),
     ("alamofire", "Swift Alamofire"),
-    # command-line and API tools
     ("curl/", "curl"),
     ("libcurl", "libcurl"),
     ("wget/", "wget"),
@@ -198,12 +183,11 @@ AUTOMATION = [
     ("siege", "Siege"),
     ("wrk", "wrk"),
     ("vegeta", "Vegeta"),
-    # security tooling
     ("sqlmap", "sqlmap"),
     ("nikto", "Nikto"),
     ("nuclei", "nuclei"),
     ("ffuf", "ffuf"),
-    ("fuzz faster u fool", "ffuf"),  # ffuf's default User-Agent
+    ("fuzz faster u fool", "ffuf"),
     ("gobuster", "gobuster"),
     ("dirbuster", "DirBuster"),
     ("dirb", "dirb"),
@@ -231,7 +215,6 @@ AUTOMATION = [
     ("xsstrike", "XSStrike"),
     ("dalfox", "dalfox"),
     ("patator", "patator"),
-    # generic
     ("agent", "self-declared agent"),
     ("bot", "bot"),
     ("crawler", "crawler"),
@@ -243,8 +226,6 @@ BROWSER_MARKERS = ("mozilla/", "chrome/", "safari/", "firefox/", "edg/", "opr/")
 
 
 def _ua_has(ua, needle):
-    """Substring match, but short needles (<= 5 chars) must start at a token boundary, so that e.g.
-    "bot" does not match "Botim" and "ab/" does not match "FB_IAB/" in real phone User-Agents."""
     if len(needle) > 5:
         return needle in ua
     suffix = r"(?![a-z0-9])" if needle[-1].isalnum() else ""
@@ -252,7 +233,6 @@ def _ua_has(ua, needle):
 
 
 def _client_label():
-    """(kind, label) from headers alone: 'ai' | 'automation', or None for a normal browser."""
     h = request.headers
     if h.get("Signature-Agent") or h.get("Signature-Input"):
         return "automation", "agent signature header (unverified)"
@@ -262,25 +242,17 @@ def _client_label():
     for needle, label in AI_AGENTS:
         if _ua_has(ua, needle):
             return "ai", label
-    # Headless Chromium (Playwright/Puppeteer) announces itself in the client hints even when the
-    # User-Agent was rewritten to look like a normal browser.
     if "headless" in (h.get("Sec-CH-UA") or "").lower():
         return "automation", "Headless Chrome (client hints)"
     for needle, label in AUTOMATION:
         if _ua_has(ua, needle):
             return "automation", label
-    # A browser-looking User-Agent that sends no Accept-Language: real browsers always do, driver-less
-    # automation (Playwright request contexts, httpx with a copied UA, ...) usually does not.
     if any(m in ua for m in BROWSER_MARKERS) and not h.get("Accept-Language"):
         return "automation", "browser UA without Accept-Language"
     return None
 
 
 def classify_client():
-    """('api-token' | 'ai' | 'automation', label), or None for a normal browser session.
-
-    A request authenticated with a CTFd access token (Authorization: Token ...) is flagged whatever its
-    User-Agent says: that is how scripts and AI agents drive the API without a browser."""
     found = _client_label()
     auth = (request.headers.get("Authorization") or "").lower()
     if auth.startswith("token "):

@@ -1,9 +1,3 @@
-"""Shared devices: a random device ID cookie per browser, recorded for every account it signs in as.
-
-A device used by accounts on different teams is a strong account-sharing signal that a VPN does not
-hide. Players can clear cookies, so it is evidence to look into, not proof.
-"""
-
 import re
 import secrets
 from datetime import datetime

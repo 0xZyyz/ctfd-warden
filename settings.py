@@ -1,10 +1,3 @@
-"""Feature switches and numeric settings.
-
-A feature is on or off from, in order: the ``WARDEN_<FEATURE>`` environment variable (``1``/``0``),
-the switch on Admin -> Warden, then the default below. Settings live in CTFd's config table, so
-they can also be preset with CTFd's ``PRESET_CONFIGS``.
-"""
-
 import os
 
 from flask import g, has_request_context
@@ -14,7 +7,6 @@ from CTFd.utils import get_config, set_config
 TRUE = ("1", "true", "yes", "on")
 FALSE = ("0", "false", "no", "off")
 
-# name -> (default, title, description)
 FEATURES = {
     "client_activity": (
         True,
@@ -51,7 +43,6 @@ FEATURES = {
 LOCK_DEFAULTS = {"threshold": 60, "window": 300, "duration": 600}
 LOCK_MINIMUMS = {"threshold": 5, "window": 60, "duration": 60}
 
-# Arab League members plus Iran: the usual "MENA" for CTF brackets. Editable on the admin page.
 MENA_COUNTRIES = "AE BH DJ DZ EG IQ IR JO KM KW LB LY MA MR OM PS QA SA SD SO SY TN YE"
 REGION_DEFAULTS = {
     "name": "MENA",
@@ -74,7 +65,6 @@ def _as_bool(value):
 
 
 def env_override(feature):
-    """True/False when ``WARDEN_<FEATURE>`` forces the feature, otherwise None."""
     return _as_bool(os.environ.get(f"WARDEN_{feature.upper()}", ""))
 
 
@@ -87,7 +77,6 @@ def _lookup(feature):
 
 
 def enabled(feature):
-    """Whether a feature is on, looked up once per request."""
     if not has_request_context():
         return _lookup(feature)
     cached = g.setdefault("warden_features", {})

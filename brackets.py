@@ -1,12 +1,3 @@
-"""Regional brackets: every account is placed in the region bracket (e.g. "MENA") when all of its
-members have a nationality from the region list, and in the outside bracket otherwise. Off by
-default.
-
-Placement runs at startup and after requests that can change accounts or teams, with one grouped
-query. A bracket an admin sets by hand (Admin -> Teams/Users -> edit) is kept until it is reset
-on the Warden page.
-"""
-
 import json
 import re
 
@@ -22,7 +13,6 @@ from .common import SAFE_METHODS, teams_mode
 from .settings import region_settings
 
 OVERRIDES_KEY = "warden_bracket_overrides"
-# Requests that can create users or teams, change membership or change a nationality.
 ACCOUNT_CHANGE_PREFIXES = (
     "/register",
     "/oauth",
@@ -59,7 +49,6 @@ def brackets():
 
 
 def ensure_brackets(old_names=None):
-    """Create the two brackets, or rename them when the names changed on the admin page."""
     region = region_settings()
     wanted = {
         region["name"]: "All members have a nationality from the region",
@@ -80,7 +69,6 @@ def ensure_brackets(old_names=None):
 
 
 def _merge_duplicates(names):
-    """Several workers starting at once on a fresh database can each create a bracket; keep one."""
     model = _model()
     for name in names:
         rows = Brackets.query.filter_by(name=name, type=_type()).order_by(Brackets.id).all()
@@ -91,7 +79,6 @@ def _merge_duplicates(names):
 
 
 def overrides():
-    """{"t<team_id>" | "u<user_id>": bracket_id or None} set by admins by hand."""
     try:
         data = json.loads(get_config(OVERRIDES_KEY) or "{}")
         return data if isinstance(data, dict) else {}
@@ -104,7 +91,6 @@ def save_overrides(data):
 
 
 def _inside_map(codes):
-    """{account_id: True when every member has a nationality from the region}."""
     inside = sa.case((sa.func.upper(Users.country).in_(sorted(codes)), 1), else_=0)
     if teams_mode():
         rows = (
@@ -158,8 +144,6 @@ def classify_all():
 
 
 def _remember_admin_bracket(kind, account_id, bracket_id):
-    """Keep a bracket an admin chose by hand; choosing the automatic one returns the account to
-    automatic placement."""
     if (kind == "teams") != teams_mode():
         return
     pinned = overrides()
@@ -192,7 +176,6 @@ def after_request(path, response):
     manual = g.pop("warden_bracket", None)
     if not (manual or path.startswith(ACCOUNT_CHANGE_PREFIXES)):
         return
-    # Never turn the player's (already successful) request into an error page.
     try:
         if manual:
             _remember_admin_bracket(*manual)

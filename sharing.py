@@ -1,12 +1,3 @@
-"""Flag sharing: on challenges whose flags are unique per team or per session (an instancer, or a
-remote service that prints a random suffix accepted by a regex flag), the same flag string coming
-from two accounts means it was passed between them.
-
-Admins pick the challenges to watch; nothing else is checked, because a normal static flag is the
-same string for everyone. Detection reads CTFd's own submissions table, so a scan can also run over
-everything submitted before the challenge was watched.
-"""
-
 import json
 
 from flask import g, request
@@ -20,8 +11,6 @@ from .models import FlagShare
 
 WATCH_KEY = "warden_shared_flag_challenges"
 ATTEMPT_PATH = "/api/v1/challenges/attempt"
-# Answers after which CTFd has stored (or already holds) the submission; ratelimited and paused
-# attempts are not recorded, so they cannot be compared.
 CHECKED_STATUSES = ("correct", "incorrect", "already_solved")
 
 
@@ -44,7 +33,6 @@ def _other_accounts(query, team_id, user_id):
 
 
 def _first_correct(challenge_id, flag, team_id, user_id):
-    """The earliest correct submission of this exact flag by another account."""
     query = Submissions.query.filter(
         Submissions.challenge_id == challenge_id,
         Submissions.provided == flag,
@@ -58,7 +46,6 @@ def _first_correct(challenge_id, flag, team_id, user_id):
 
 
 def _record(challenge_id, flag, owner, team_id, user_id, status, ip, date=None):
-    """Store one event per (challenge, owner account, other account). Returns True when new."""
     same = FlagShare.query.filter_by(challenge_id=challenge_id)
     if teams_mode():
         same = same.filter_by(owner_team_id=owner.team_id, team_id=team_id)
@@ -93,7 +80,6 @@ def before_request(path, user):
         return
     if challenge_id not in watched():
         return
-    # CTFd strips the submission the same way before storing it.
     flag = str(body.get("submission") or "").strip()
     if flag:
         g.warden_share = (challenge_id, flag, user.id, user.team_id)
@@ -119,7 +105,6 @@ def after_request(response):
 
 
 def scan():
-    """Check every past submission on the watched challenges. Returns the number of new events."""
     created = 0
     for challenge_id in sorted(watched()):
         rows = (

@@ -1,9 +1,3 @@
-"""Client activity: requests from self-identified AI agents, automation libraries and API tokens.
-
-These are hints, not proof: headers can be changed, and scripts and API tokens are normal CTF tools.
-Similar requests are sampled once per user and client every ten minutes.
-"""
-
 import hashlib
 
 from flask import jsonify, request
@@ -59,7 +53,6 @@ def before_request(path, user):
 
 
 def after_request(response):
-    """A player creating a CTFd access token is logged even before the token is ever used."""
     if (
         request.method != "POST"
         or request_path().rstrip("/") != "/api/v1/tokens"
@@ -84,9 +77,6 @@ def after_request(response):
 
 @blueprint.route("/warden/client-signal", methods=["POST"])
 def client_signal():
-    """warden.js reports in-page automation marks (navigator.webdriver, Selenium / Playwright /
-    Puppeteer globals). They exist even when the tool drives a real browser with a normal
-    User-Agent."""
     if not authed() or is_admin() or not settings.enabled("client_activity"):
         return jsonify({"success": True})
     body = request.get_json(silent=True) or {}

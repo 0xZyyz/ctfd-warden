@@ -1,9 +1,3 @@
-"""Flag sharing: the same unique flag submitted by two accounts on one challenge.
-
-Revision ID: 7b3e9c1f5a20
-Revises: 4e7a1c9d2b30
-"""
-
 import sqlalchemy as sa
 
 revision = "7b3e9c1f5a20"

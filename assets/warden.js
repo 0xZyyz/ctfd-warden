@@ -1,6 +1,3 @@
-/* Warden: report browser-automation marks to the server.
- * Selenium, Playwright and Puppeteer leave these even when they drive a real browser with a normal
- * User-Agent. Nothing is sent for ordinary browsers or logged-out visitors. */
 (function () {
   "use strict";
   try {
@@ -27,7 +24,5 @@
     };
     if (document.readyState === "complete") send();
     else window.addEventListener("load", send);
-  } catch (e) {
-    /* never break the page */
-  }
+  } catch (e) {}
 })();

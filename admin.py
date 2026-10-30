@@ -1,5 +1,3 @@
-"""Admin pages: Warden (settings, lockouts, blocks, brackets), Client activity, Shared devices, Flag sharing."""
-
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -34,7 +32,6 @@ def _int(value):
 
 
 def _account_label(key):
-    """(name, endpoint, url args) for a "t<id>" / "u<id>" account key."""
     kind, account_id = key[:1], _int(key[1:])
     if kind == "t":
         team = Teams.query.filter_by(id=account_id).first()
@@ -313,7 +310,6 @@ def devices():
             },
         )
         d["rows"].append({"user": u, "last_seen": r.last_seen})
-        # In users mode every account is its own "team" for this page.
         d["teams"].add(u.team_id if teams_mode() else u.id)
         if r.last_seen > d["last_seen"]:
             d["last_seen"], d["ip"], d["user_agent"] = r.last_seen, r.ip, r.user_agent

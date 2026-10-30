@@ -1,9 +1,3 @@
-"""Warden tables: client events, device sessions and lockout events.
-
-Revision ID: 4e7a1c9d2b30
-Revises:
-"""
-
 import sqlalchemy as sa
 
 revision = "4e7a1c9d2b30"

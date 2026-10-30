@@ -7,8 +7,6 @@ from CTFd.utils import get_config
 
 blueprint = Blueprint("warden", __name__)
 
-# The folder this plugin was installed as (e.g. "ctfd-warden" for a plain git clone). CTFd serves
-# plugin templates, assets and migrations by folder name, so nothing below assumes a fixed name.
 PLUGIN_NAME = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATES = f"plugins/{PLUGIN_NAME}/templates"
 ASSETS = f"/plugins/{PLUGIN_NAME}/assets/"
@@ -20,7 +18,6 @@ def template(name):
 
 
 def request_path():
-    """Request path without the CTFd script root (CTFd may be served from a sub-directory)."""
     root = request.script_root.rstrip("/")
     path = request.path
     return path[len(root) :] if root and path.startswith(root) else path
@@ -31,17 +28,12 @@ def teams_mode():
 
 
 def account_key(user):
-    """What a lockout or a challenge block applies to: the team in teams mode, else the user."""
     if teams_mode():
         return f"t{user.team_id}" if user.team_id else None
     return f"u{user.id}"
 
 
 def handle_removal(model, id_column=None):
-    """POST action=remove (one row) / clear (all rows) on an admin list page.
-
-    Returns a message, or None when the request was not a removal. CTFd checks the form nonce on
-    every POST before this runs."""
     if request.method != "POST":
         return None
     action = request.form.get("action")

@@ -1,10 +1,3 @@
-"""Team privacy: other players cannot see who is on a team, where its members are from, or browse
-the user list. Admins see everything. Off by default.
-
-Responses are filtered after CTFd's own caches, so cached data is never changed and a player
-always sees their own team in full.
-"""
-
 import re
 
 from flask import abort, jsonify, request
@@ -14,7 +7,6 @@ from CTFd.utils.user import authed, get_current_user, is_admin
 from .common import SAFE_METHODS, teams_mode
 
 ADMIN_ONLY_LISTS = {"/users", "/api/v1/users"}
-# Individual user profiles (page and API, but not /api/v1/users/me).
 ADMIN_ONLY_USER_PAGES = re.compile(r"^/(users|api/v1/users)/\d+(/.*)?$")
 TEAM_DETAIL = re.compile(r"/api/v1/teams/(\d+)(?:/(solves|awards))?")
 SCOREBOARD_TOP = re.compile(r"/api/v1/scoreboard/top/\d+")
@@ -25,7 +17,6 @@ def before_request(path):
     if is_admin():
         return
     stripped = path.rstrip("/")
-    # A country filter on the team list would reveal member countries one query at a time.
     if stripped == "/api/v1/teams" and (
         "country" in request.args or request.args.get("field") == "country"
     ):
@@ -76,6 +67,5 @@ def after_request(path, response):
                 for solve in item.get("solves", []):
                     _hide(solve)
     response.set_data(jsonify(body).get_data())
-    # A response can contain the viewer's own roster, so intermediaries must not share it.
     response.headers["Cache-Control"] = "private, no-store"
     response.vary.add("Cookie")

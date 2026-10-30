@@ -1,5 +1,3 @@
-"""Fast tests that need Flask but not a CTFd database."""
-
 from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import patch
