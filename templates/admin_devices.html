@@ -23,7 +23,7 @@
   </p>
   <p class="text-muted">
     {{ devices_total }} devices seen, {{ accounts_total }} device/account pairs,
-    <b>{{ cross_team | length }}</b> devices shared across {{ 'teams' if teams_mode else 'accounts' }}.
+    <b>{{ cross_team | length }}</b> device{{ '' if cross_team | length == 1 else 's' }} shared across {{ 'teams' if teams_mode else 'accounts' }}.
   </p>
   <form method="POST" class="mb-4" onsubmit="return confirm('Remove every device record?');">
     <input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="clear">

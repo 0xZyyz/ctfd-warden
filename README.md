@@ -4,6 +4,8 @@
 ![CTFd 3.8](https://img.shields.io/badge/CTFd-3.8.x-blue)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
+**Built with ❤️ to bring the old CTF era back: real skills, fair play, no shortcuts.**
+
 Warden gives CTF organisers the tools to keep a competition fair: detection of AI agents, scripts,
 shared accounts, shared flags and suspiciously fast solves, a per-challenge flag brute-force
 lockout, and per-team challenge bans. It grew out of the anti-cheat tooling used at
@@ -25,11 +27,19 @@ Every feature can be switched on or off from **Admin → Warden**, without a res
 | **Challenge blocks** | always available | Bar one team or user from one challenge, e.g. after revoking a solve for flag sharing. The challenge disappears from their list and submissions are refused. |
 | **Team privacy** | off | Hides team rosters, member countries and the user list from other players. Admins and the team itself still see everything. |
 
-![Client activity](docs/screenshots/client-activity.png)
-
 > [!IMPORTANT]
 > Client signals are **hints, not proof**. Headers can be forged, and scripts and API tokens are
 > normal CTF tools. Use Warden's data to decide where to look, together with other evidence.
+
+## Screenshots
+
+| Overview | Client activity |
+| --- | --- |
+| ![Overview: feature switches, lockouts and challenge blocks](docs/screenshots/overview.png) | ![Client activity: AI agents, scripts and API tokens](docs/screenshots/client-activity.png) |
+| **Shared devices** | **Flag sharing** |
+| ![Shared devices: one browser used by two teams](docs/screenshots/shared-devices.png) | ![Flag sharing: a unique flag submitted by two teams](docs/screenshots/flag-sharing.png) |
+| **Fast solves** | |
+| ![Fast solves: four challenges solved in twelve seconds](docs/screenshots/fast-solves.png) | |
 
 ## Install
 
@@ -135,6 +145,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and conventions, a
 Built by [Mohamed Aziz Rahmouni (0xZyyz)](https://github.com/0xZyyz) for
 [Securinets](https://github.com/securinets-insat) CTF Quals 2026, and released so other organisers
 can use it.
+
+If Warden keeps your CTF fair, give the repo a ⭐ so other organisers can find it too.
 
 ## License
 
