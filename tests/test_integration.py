@@ -258,7 +258,7 @@ def test_team_privacy_hides_rosters_and_user_list(teams_app):
         assert "members" in client.get(f"/api/v1/teams/{theirs_id}").get_json()["data"]
 
 
-UNIQUE = r"Securinets\{dejavu_[0-9a-f]{16}\}"
+UNIQUE = r"flag\{unique_[0-9a-f]{16}\}"
 
 
 def submit(client, challenge_id, flag):
@@ -273,18 +273,18 @@ def submit(client, challenge_id, flag):
 def test_flag_sharing_catches_a_unique_flag_from_another_account(app):
     alice, bob = player(app, name="alice"), player(app, name="bob")
     with app.app_context():
-        unique = gen_challenge(db, name="dejavu").id
+        unique = gen_challenge(db, name="instanced").id
         gen_flag(db, challenge_id=unique, content=UNIQUE, type="regex")
         static = gen_challenge(db, name="static").id
         gen_flag(db, challenge_id=static, content="flag{same-for-all}")
         sharing.save_watched([unique])
-    alices = "Securinets{dejavu_00112233aabbccdd}"
+    alices = "flag{unique_00112233aabbccdd}"
     with login_as_user(app, name="alice") as client:
         assert submit(client, unique, alices) == "correct"
         assert submit(client, static, "flag{same-for-all}") == "correct"
     with login_as_user(app, name="bob") as client:
         assert submit(client, static, "flag{same-for-all}") == "correct"
-        assert submit(client, unique, "Securinets{dejavu_ffffffffffffffff}") == "correct"
+        assert submit(client, unique, "flag{unique_ffffffffffffffff}") == "correct"
     with app.app_context():
         assert FlagShare.query.count() == 0, "own unique flags and unwatched static flags are fine"
     carol = player(app, name="carol")
@@ -329,7 +329,7 @@ def test_flag_sharing_ignores_teammates_and_flags_other_teams(teams_app):
         chal = gen_challenge(db).id
         gen_flag(db, challenge_id=chal, content=UNIQUE, type="regex")
         sharing.save_watched([chal])
-    flag = "Securinets{dejavu_0123456789abcdef}"
+    flag = "flag{unique_0123456789abcdef}"
     with login_as_user(app, name="r1") as client:
         assert submit(client, chal, flag) == "correct"
     with login_as_user(app, name="r2") as client:
@@ -348,10 +348,10 @@ def test_flag_sharing_scan_of_past_submissions(app):
     with app.app_context():
         chal = gen_challenge(db).id
         other = gen_challenge(db, name="unwatched").id
-        gen_solve(db, user_id=alice, challenge_id=chal, provided="Securinets{dejavu_aaaa}")
-        gen_solve(db, user_id=bob, challenge_id=chal, provided="Securinets{dejavu_aaaa}")
-        gen_fail(db, user_id=carol, challenge_id=chal, provided="Securinets{dejavu_aaaa}")
-        gen_solve(db, user_id=carol, challenge_id=chal, provided="Securinets{dejavu_cccc}")
+        gen_solve(db, user_id=alice, challenge_id=chal, provided="flag{unique_aaaa}")
+        gen_solve(db, user_id=bob, challenge_id=chal, provided="flag{unique_aaaa}")
+        gen_fail(db, user_id=carol, challenge_id=chal, provided="flag{unique_aaaa}")
+        gen_solve(db, user_id=carol, challenge_id=chal, provided="flag{unique_cccc}")
         gen_solve(db, user_id=alice, challenge_id=other, provided="flag{x}")
         gen_solve(db, user_id=bob, challenge_id=other, provided="flag{x}")
         sharing.save_watched([chal])
@@ -363,11 +363,11 @@ def test_flag_sharing_scan_of_past_submissions(app):
 
 def test_flag_sharing_admin_page(app):
     with app.app_context():
-        chal = gen_challenge(db, name="dejavu").id
+        chal = gen_challenge(db, name="instanced").id
         gen_flag(db, challenge_id=chal, content=UNIQUE, type="regex")
     with login_as_user(app, name="admin") as client:
         page = client.get("/admin/warden/sharing")
-        assert page.status_code == 200 and b"dejavu" in page.data and b"regex" in page.data
+        assert page.status_code == 200 and b"instanced" in page.data and b"regex" in page.data
         r = client.post(
             "/admin/warden/sharing",
             data={"nonce": nonce(client), "action": "watch", "challenge_id": [str(chal), "9999"]},

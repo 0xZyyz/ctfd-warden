@@ -4,9 +4,9 @@
 ![CTFd 3.8](https://img.shields.io/badge/CTFd-3.8.x-blue)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
-Warden gives CTF organisers the tools to keep a competition fair: detection of AI agents, scripts
-and shared accounts, a per-challenge flag brute-force lockout, and per-team challenge bans. It grew
-out of the anti-cheat tooling used at **Securinets CTF Quals 2026**.
+Warden gives CTF organisers the tools to keep a competition fair: detection of AI agents, scripts,
+shared accounts, shared flags and suspiciously fast solves, a per-challenge flag brute-force
+lockout, and per-team challenge bans.
 
 Copy one folder into CTFd, restart, done. No theme changes, no CTFd core patches.
 
@@ -95,8 +95,8 @@ Use `1`/`0` (or `true`/`false`, `on`/`off`). Unset means the admin page decides.
 Flag sharing can only be detected when teams get **different** flags. Two common ways:
 
 - **Remote services** (`nc`, web): have the service add a random suffix to the flag for every
-  connection, e.g. `flag{deja_vu_<16 hex>}`, and give the challenge a **regex** flag such as
-  `flag\{deja_vu_[0-9a-f]{16}\}`. Logging the suffix on the server side also lets you trace
+  connection, e.g. `flag{remote_<16 hex>}`, and give the challenge a **regex** flag such as
+  `flag\{remote_[0-9a-f]{16}\}`. Logging the suffix on the server side also lets you trace
   any submitted flag back to one connection.
 - **Instancers** that put a different flag in every team's instance.
 
@@ -152,9 +152,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and conventions, a
 
 ## Credits
 
-Built by [Mohamed Aziz Rahmouni (0xZyyz)](https://github.com/0xZyyz) for
-[Securinets](https://github.com/securinets-insat) CTF Quals 2026, and released so other organisers
-can use it.
+Built by [Mohamed Aziz Rahmouni (0xZyyz)](https://github.com/0xZyyz).
 
 ## License
 

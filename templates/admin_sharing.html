@@ -19,7 +19,7 @@
 
   <p>
     Some challenges give every {{ 'team' if teams_mode else 'player' }} or connection its own flag: an instancer, or a remote
-    service that prints a random suffix accepted by a regex flag (for example <code>flag\{deja_vu_[0-9a-f]{16}\}</code>).
+    service that prints a random suffix accepted by a regex flag (for example <code>flag\{remote_[0-9a-f]{16}\}</code>).
     On those, the same flag coming from two {{ 'teams' if teams_mode else 'players' }} means it was passed between them.
   </p>
   <p class="text-muted">
