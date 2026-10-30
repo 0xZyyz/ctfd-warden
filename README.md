@@ -95,8 +95,8 @@ Use `1`/`0` (or `true`/`false`, `on`/`off`). Unset means the admin page decides.
 Flag sharing can only be detected when teams get **different** flags. Two common ways:
 
 - **Remote services** (`nc`, web): have the service add a random suffix to the flag for every
-  connection, e.g. `flag{remote_<16 hex>}`, and give the challenge a **regex** flag such as
-  `flag\{remote_[0-9a-f]{16}\}`. Logging the suffix on the server side also lets you trace
+  connection, e.g. `flag{some_string_<16 hex>}`, and give the challenge a **regex** flag such as
+  `flag\{some_string_[0-9a-f]{16}\}`. Logging the suffix on the server side also lets you trace
   any submitted flag back to one connection.
 - **Instancers** that put a different flag in every team's instance.
 
