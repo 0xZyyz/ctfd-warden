@@ -14,7 +14,7 @@ detection.py             User-Agent / header classification (AI agents, automati
 devices.py               device-ID cookie and shared-device records
 lockout.py               flag brute-force lockout
 sharing.py               flag sharing (same unique flag from two accounts)
-fastsolves.py            fast solves (time from first opening a challenge to solving it)
+fastsolves.py            fast solves (several solves by one player in a short time)
 blocks.py                per-account challenge blocks
 privacy.py               team privacy response filtering
 brackets.py              regional brackets

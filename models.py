@@ -77,18 +77,3 @@ class FlagShare(db.Model):
     ip = db.Column(db.String(46))
     date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
-
-class ChallengeView(db.Model):
-    __tablename__ = "warden_challenge_views"
-
-    account = db.Column(db.String(16), primary_key=True)
-    challenge_id = db.Column(
-        db.Integer, db.ForeignKey("challenges.id", ondelete="CASCADE"), primary_key=True
-    )
-    team_id = db.Column(
-        db.Integer, db.ForeignKey("teams.id", ondelete="SET NULL"), nullable=True
-    )
-    user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
-    date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

@@ -20,7 +20,7 @@ Every feature can be switched on or off from **Admin → Warden**, without a res
 | **Shared devices** | on | Every browser gets a random device-ID cookie. Devices used by accounts on different teams are listed, a strong account-sharing signal that a VPN does not hide. |
 | **Flag brute-force lockout** | on | A team (or user) that submits too many wrong flags on one challenge is locked out of that challenge for a while. Threshold, window and duration are configurable. |
 | **Flag sharing** | on | For challenges you mark as having unique flags (an instancer, or a remote service that prints a per-session suffix accepted by a regex flag), reports the same flag submitted by two teams: who had it first, who reused it, and whether CTFd accepted it. A scan button checks everything submitted before, so you can audit a finished event too. |
-| **Fast solves** | on | Records when each team (or user) first opens a challenge, and lists solves that came within a minute of it, or of a challenge the team never opened at all (a flag sent straight to the API). Each solve is shown next to the challenge's median solve time. The time limit is configurable, and challenges meant to be instant, like a welcome flag, can be ignored. |
+| **Fast solves** | always available | Lists players who solved several challenges in a short time, by default 3 within 2 minutes, with the challenges and times. It reads CTFd's own solves, so it also works on a finished event. The numbers are configurable, and challenges meant to be instant, like a welcome flag, can be ignored. |
 | **Challenge blocks** | always available | Bar one team or user from one challenge, e.g. after revoking a solve for flag sharing. The challenge disappears from their list and submissions are refused. |
 | **Team privacy** | off | Hides team rosters, member countries and the user list from other players. Admins and the team itself still see everything. |
 | **Regional brackets** | off | Places each team (or user, in users mode) in a regional bracket such as *MENA* / *Outside MENA* from members' nationalities. Bracket names and country list are configurable; manual admin choices are kept. |
@@ -84,7 +84,6 @@ as locked on the admin page.
 | `WARDEN_DEVICE_TRACKING` | Shared devices |
 | `WARDEN_FLAG_LOCKOUT` | Flag brute-force lockout |
 | `WARDEN_FLAG_SHARING` | Flag sharing |
-| `WARDEN_FAST_SOLVES` | Fast solves |
 | `WARDEN_TEAM_PRIVACY` | Team privacy |
 | `WARDEN_REGIONAL_BRACKETS` | Regional brackets |
 
@@ -102,12 +101,6 @@ Flag sharing can only be detected when teams get **different** flags. Two common
 
 Then tick the challenge on **Admin → Warden → Flag sharing**. Warden compares every submission on
 watched challenges, accepted or not, with the earlier correct submissions of other teams.
-
-### Fast solves
-
-Opens are recorded from the moment Warden is installed (or the feature is switched on), so
-install it before the event starts. Opening a challenge in any standard theme loads it from
-`/api/v1/challenges/<id>`, which is what Warden records. Admins' own solves are never reported.
 
 ### Regional brackets
 
@@ -131,8 +124,7 @@ pages.
 | Random device ID, user, last IP, User-Agent, first and last seen | `warden_device_sessions` + `warden_device` cookie (HttpOnly, 1 year) | Shared devices |
 | Lockouts: time, team, user, challenge, IP, attempt count | `warden_lockout_events` | Flag lockout |
 | Shared flags: challenge, flag, both teams and players, result, IP, time | `warden_flag_shares` | Flag sharing |
-| First time each team or user opened each challenge | `warden_challenge_views` | Fast solves |
-| Settings, challenge blocks, manual brackets | CTFd's `config` table, keys `warden_*` | Configuration |
+| Settings, challenge blocks, manual brackets, fast solve limits | CTFd's `config` table, keys `warden_*` | Configuration |
 
 Ordinary browser requests are never logged. Warden sends nothing to third parties.
 

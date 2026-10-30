@@ -45,14 +45,11 @@ def _account_label(key):
 def _handle_post():
     action = request.form.get("action")
     if action == "features":
-        was_tracking = settings.enabled("fast_solves")
         for name in settings.FEATURES:
             if settings.env_override(name) is None:
                 settings.set_enabled(name, request.form.get(name) == "on")
         if settings.enabled("regional_brackets"):
             brackets.ensure_brackets()
-        if settings.enabled("fast_solves") and not was_tracking:
-            fastsolves.start_tracking(reset=True)
         return "Features saved."
     if action == "lock-settings":
         values = {k: _int(request.form.get(k)) for k in settings.LOCK_DEFAULTS}
@@ -408,44 +405,46 @@ def _duration(seconds):
 def fast_solves():
     message = None
     if request.method == "POST" and request.form.get("action") == "fast-settings":
-        seconds = _int(request.form.get("seconds"))
-        if seconds is None or not fastsolves.MIN_SECONDS <= seconds <= fastsolves.MAX_SECONDS:
+        count, seconds = _int(request.form.get("count")), _int(request.form.get("seconds"))
+        count_low, count_high = fastsolves.LIMITS["count"]
+        sec_low, sec_high = fastsolves.LIMITS["seconds"]
+        if count is None or seconds is None or not (
+            count_low <= count <= count_high and sec_low <= seconds <= sec_high
+        ):
             message = (
-                f"Not saved: the time must be between {fastsolves.MIN_SECONDS} and "
-                f"{fastsolves.MAX_SECONDS} seconds."
+                f"Not saved: use {count_low} to {count_high} solves "
+                f"and {sec_low} to {sec_high} seconds."
             )
         else:
             ids = {int(c) for c in request.form.getlist("ignore") if c.isdigit()}
             known = {c for (c,) in db.session.query(Challenges.id).filter(Challenges.id.in_(ids))}
-            fastsolves.save_threshold(seconds)
+            fastsolves.save_settings(count, seconds)
             fastsolves.save_ignored(known)
             message = "Fast solve settings saved."
 
-    found = fastsolves.rows()
+    found = fastsolves.bursts()
     per_page = 100
     pages = max(1, -(-len(found) // per_page))
     page = min(pages, max(1, request.args.get("page", 1, type=int)))
     shown = found[(page - 1) * per_page : page * per_page]
 
     ignored = fastsolves.ignored()
-    challenges = [
-        {"id": c.id, "name": c.name, "category": c.category, "ignored": c.id in ignored}
-        for c in Challenges.query.order_by(Challenges.category, Challenges.name).all()
-    ]
-    names = {c["id"]: c["name"] for c in challenges}
-    user_ids = {r["solve"].user_id for r in shown if r["solve"].user_id}
-    team_ids = {r["solve"].team_id for r in shown if r["solve"].team_id}
+    challenges = Challenges.query.order_by(Challenges.category, Challenges.name).all()
+    names = {c.id: c.name for c in challenges}
+    user_ids = {b["user_id"] for b in shown}
+    team_ids = {b["team_id"] for b in shown if b["team_id"]}
     users = {u.id: u for u in Users.query.filter(Users.id.in_(user_ids)).all()} if user_ids else {}
     teams = {t.id: t for t in Teams.query.filter(Teams.id.in_(team_ids)).all()} if team_ids else {}
     return render_template(
         template("admin_fast.html"),
-        enabled=settings.enabled("fast_solves"),
         message=message,
-        seconds=fastsolves.threshold(),
-        since=fastsolves.since(),
-        challenges=challenges,
+        limits=fastsolves.settings(),
+        challenges=[
+            {"id": c.id, "name": c.name, "category": c.category, "ignored": c.id in ignored}
+            for c in challenges
+        ],
         names=names,
-        rows=shown,
+        bursts=shown,
         total=len(found),
         page=page,
         pages=pages,

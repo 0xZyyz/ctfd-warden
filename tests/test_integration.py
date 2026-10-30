@@ -2,15 +2,9 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from CTFd.models import Brackets, Flags, Solves, Teams, Users, db
+from CTFd.models import Brackets, Flags, Teams, Users, db
 from CTFd.plugins.warden import blocks, brackets, fastsolves, settings, sharing
-from CTFd.plugins.warden.models import (
-    ChallengeView,
-    ClientEvent,
-    DeviceSession,
-    FlagShare,
-    LockoutEvent,
-)
+from CTFd.plugins.warden.models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
 from CTFd.utils.security.auth import generate_user_token
 from tests.helpers import (
     create_ctfd,
@@ -449,91 +443,92 @@ def test_admin_pages_survive_deleted_accounts(app):
         assert client.get("/admin/warden").status_code == 200
 
 
-def test_fast_solves_report_quick_and_unopened_solves(teams_app):
+
+def solve_at(user_id, challenge_id, when, team_id=None):
+    solve = gen_solve(db, user_id=user_id, team_id=team_id, challenge_id=challenge_id)
+    solve.date = when
+    db.session.commit()
+
+
+def test_fast_solves_report_solve_bursts(app):
+    alice, bob = player(app, name="alice"), player(app, name="bob")
+    start = datetime(2030, 1, 1, 12, 0, 0)
+    at = lambda seconds: start + timedelta(seconds=seconds)
+    with app.app_context():
+        c1, c2, c3, c4, c5 = (gen_challenge(db, name=f"c{i}").id for i in range(1, 6))
+        admin = Users.query.filter_by(type="admin").first().id
+        for challenge, seconds in ((c1, 0), (c2, 20), (c3, 50), (c4, 100), (c5, 1000)):
+            solve_at(alice, challenge, at(seconds))
+        for challenge, seconds in ((c1, 0), (c2, 100), (c3, 400)):
+            solve_at(bob, challenge, at(seconds))
+        for challenge, seconds in ((c1, 0), (c2, 1), (c3, 2)):
+            solve_at(admin, challenge, at(seconds))
+
+        found = fastsolves.bursts()
+        assert len(found) == 1, "overlapping windows merge; bob and the admin are not reported"
+        burst = found[0]
+        assert burst["user_id"] == alice and burst["seconds"] == 100
+        assert [s.challenge_id for s in burst["solves"]] == [c1, c2, c3, c4]
+
+        fastsolves.save_ignored([c2])
+        assert [s.challenge_id for s in fastsolves.bursts()[0]["solves"]] == [c1, c3, c4]
+        fastsolves.save_ignored([c2, c3])
+        assert fastsolves.bursts() == []
+
+        fastsolves.save_ignored([])
+        fastsolves.save_settings(2, 300)
+        found = {b["user_id"]: [s.challenge_id for s in b["solves"]] for b in fastsolves.bursts()}
+        assert found == {alice: [c1, c2, c3, c4], bob: [c1, c2, c3]}
+
+
+def test_fast_solves_are_per_player_not_per_team(teams_app):
     app = teams_app
+    start = datetime(2030, 1, 1, 12, 0, 0)
     with app.app_context():
-        teams = {}
-        for team_name, members in (("Red", ("r1", "r2")), ("Blue", ("b1",)), ("Green", ("g1",))):
-            team = gen_team(db, name=team_name, email=f"{team_name}@example.test", member_count=0)
-            teams[team_name] = team.id
-            for name in members:
-                gen_user(db, name=name, email=f"{name}@example.test", team_id=team.id, verified=True)
-        chal = gen_challenge(db, name="hard").id
-        gen_flag(db, challenge_id=chal, content="flag{hard}")
-        welcome = gen_challenge(db, name="welcome").id
-        gen_flag(db, challenge_id=welcome, content="flag{welcome}")
-        assert fastsolves.since() is not None
-    with login_as_user(app, name="r1") as client:
-        assert client.get("/api/v1/challenges", headers=BROWSER).status_code == 200
-        assert client.get(f"/api/v1/challenges/{chal}", headers=BROWSER).status_code == 200
-    with login_as_user(app, name="r2") as client:
-        client.get(f"/api/v1/challenges/{chal}", headers=BROWSER)
-    with app.app_context():
-        view = ChallengeView.query.one()
-        assert view.account == f"t{teams['Red']}" and view.challenge_id == chal
-        view.date -= timedelta(hours=2)
-        db.session.commit()
-    with login_as_user(app, name="r2") as client:
-        assert submit(client, chal, "flag{hard}") == "correct"
-    with login_as_user(app, name="b1") as client:
-        client.get(f"/api/v1/challenges/{chal}", headers=BROWSER)
-        assert submit(client, chal, "flag{hard}") == "correct"
-        client.get(f"/api/v1/challenges/{welcome}", headers=BROWSER)
-        assert submit(client, welcome, "flag{welcome}") == "correct"
-    with login_as_user(app, name="g1") as client:
-        assert submit(client, chal, "flag{hard}") == "correct"
-    with app.app_context():
-        found = {(r["solve"].team_id, r["solve"].challenge_id): r for r in fastsolves.rows()}
-        assert set(found) == {
-            (teams["Blue"], chal),
-            (teams["Blue"], welcome),
-            (teams["Green"], chal),
-        }, "the slow solve and the listing request are not reported"
-        assert found[(teams["Blue"], chal)]["seconds"] < 60
-        assert found[(teams["Green"], chal)]["seconds"] is None
-        assert found[(teams["Green"], chal)]["opened"] is None
-        assert 3500 < found[(teams["Blue"], chal)]["median"] < 3700
-
-        fastsolves.save_ignored([welcome])
-        fastsolves.save_threshold(3 * 3600)
-        found = {(r["solve"].team_id, r["solve"].challenge_id) for r in fastsolves.rows()}
-        assert found == {(teams["Red"], chal), (teams["Blue"], chal), (teams["Green"], chal)}
-
-
-def test_fast_solves_skip_solves_before_tracking_started(app):
-    alice = player(app, name="alice")
-    with app.app_context():
-        chal = gen_challenge(db).id
-        solve = gen_solve(db, user_id=alice, challenge_id=chal)
-        solve.date = fastsolves.since() - timedelta(minutes=5)
-        gen_solve(db, user_id=Users.query.filter_by(type="admin").first().id, challenge_id=chal)
-        db.session.commit()
-        assert fastsolves.rows() == [], "old solves and admin solves are not reported"
-        fastsolves.start_tracking(reset=True)
-        assert fastsolves.since() > solve.date
+        team = gen_team(db, name="Red", email="red@example.test", member_count=0)
+        r1 = gen_user(db, name="r1", email="r1@example.test", team_id=team.id, verified=True).id
+        r2 = gen_user(db, name="r2", email="r2@example.test", team_id=team.id, verified=True).id
+        c1, c2, c3, c4 = (gen_challenge(db, name=f"c{i}").id for i in range(1, 5))
+        solve_at(r1, c1, start, team.id)
+        solve_at(r2, c2, start + timedelta(seconds=10), team.id)
+        solve_at(r1, c3, start + timedelta(seconds=20), team.id)
+        assert fastsolves.bursts() == [], "three team solves, but only two by the same player"
+        solve_at(r1, c4, start + timedelta(seconds=30), team.id)
+        burst = fastsolves.bursts()[0]
+        assert burst["user_id"] == r1 and burst["team_id"] == team.id
+        assert [s.challenge_id for s in burst["solves"]] == [c1, c3, c4]
 
 
 def test_fast_solves_admin_page(app):
     player(app, name="alice")
     with app.app_context():
-        chal = gen_challenge(db, name="quickie").id
-        gen_flag(db, challenge_id=chal, content="flag{q}")
+        ids = []
+        for i in range(3):
+            ids.append(gen_challenge(db, name=f"quick{i}").id)
+            gen_flag(db, challenge_id=ids[-1], content=f"flag{{q{i}}}")
     with login_as_user(app, name="alice") as client:
-        client.get(f"/api/v1/challenges/{chal}", headers=BROWSER)
-        assert submit(client, chal, "flag{q}") == "correct"
+        for i, chal in enumerate(ids):
+            assert submit(client, chal, f"flag{{q{i}}}") == "correct"
     with login_as_user(app, name="admin") as client:
         page = client.get("/admin/warden/fast-solves")
-        assert page.status_code == 200 and b"quickie" in page.data and b"alice" in page.data
+        assert page.status_code == 200 and b"alice" in page.data and b"quick2" in page.data
+        assert b"3 in " in page.data
         r = client.post(
             "/admin/warden/fast-solves",
-            data={"nonce": nonce(client), "action": "fast-settings", "seconds": "2"},
+            data={"nonce": nonce(client), "action": "fast-settings", "count": "1", "seconds": "60"},
         )
         assert b"Not saved" in r.data
         r = client.post(
             "/admin/warden/fast-solves",
-            data={"nonce": nonce(client), "action": "fast-settings", "seconds": "120", "ignore": [str(chal)]},
+            data={
+                "nonce": nonce(client),
+                "action": "fast-settings",
+                "count": "3",
+                "seconds": "60",
+                "ignore": [str(ids[0])],
+            },
         )
-        assert b"Fast solve settings saved" in r.data and b"No fast solves found" in r.data
+        assert b"Fast solve settings saved" in r.data and b"No solve bursts found" in r.data
     with app.app_context():
-        assert fastsolves.threshold() == 120 and fastsolves.ignored() == {chal}
-        assert Solves.query.count() == 1
+        assert fastsolves.settings() == {"count": 3, "seconds": 60}
+        assert fastsolves.ignored() == {ids[0]}

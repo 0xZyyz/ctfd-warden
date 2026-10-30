@@ -8,8 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- Fast solves: record when each account first opens a challenge and report solves that come
-  too soon after it, or of a challenge it never opened, with the challenge's median solve time.
+- Fast solves: list players who solved several challenges in a short time, with configurable
+  limits and ignored challenges.
 
 ## [1.0.0] - 2026-10-29
 
