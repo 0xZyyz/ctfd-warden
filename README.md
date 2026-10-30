@@ -6,7 +6,8 @@
 
 Warden gives CTF organisers the tools to keep a competition fair: detection of AI agents, scripts,
 shared accounts, shared flags and suspiciously fast solves, a per-challenge flag brute-force
-lockout, and per-team challenge bans.
+lockout, and per-team challenge bans. It grew out of the anti-cheat tooling used at
+**Securinets CTF Quals 2026**.
 
 Copy one folder into CTFd, restart, done. No theme changes, no CTFd core patches.
 
@@ -144,7 +145,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and conventions, a
 
 ## Credits
 
-Built by [Mohamed Aziz Rahmouni (0xZyyz)](https://github.com/0xZyyz).
+Built by [Mohamed Aziz Rahmouni (0xZyyz)](https://github.com/0xZyyz) for
+[Securinets](https://github.com/securinets-insat) CTF Quals 2026, and released so other organisers
+can use it.
 
 ## License
 
