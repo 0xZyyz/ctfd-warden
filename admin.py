@@ -6,8 +6,9 @@ from flask import render_template, request
 from CTFd.models import Challenges, Flags, Teams, Tokens, Users, db
 from CTFd.utils.decorators import admins_only
 
-from . import blocks, fastsolves, settings, sharing
+from . import accounts, blocks, fastsolves, settings, sharing
 from .common import blueprint, handle_removal, teams_mode, template
+from .filters import Filters
 from .models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
 
 
@@ -33,13 +34,32 @@ def _int(value):
 
 def _account_label(key):
     kind, account_id = key[:1], _int(key[1:])
+    current = (kind == "t") == teams_mode()
     if kind == "t":
         team = Teams.query.filter_by(id=account_id).first()
         name = team.name if team else f"Deleted team #{account_id}"
+        if current:
+            return name, "warden.account", {"account_id": account_id}
         return name, "admin.teams_detail", {"team_id": account_id}
     user = Users.query.filter_by(id=account_id).first()
     name = user.name if user else f"Deleted user #{account_id}"
+    if current:
+        return name, "warden.account", {"account_id": account_id}
     return name, "admin.users_detail", {"user_id": account_id}
+
+
+def _members(filters):
+    if not (teams_mode() and filters["player"]):
+        return {}
+    out = {}
+    for user_id, team_id in db.session.query(Users.id, Users.team_id):
+        out.setdefault(team_id, []).append(user_id)
+    return out
+
+
+def _lookup(model, ids):
+    ids = {i for i in ids if i}
+    return {row.id: row for row in model.query.filter(model.id.in_(ids)).all()} if ids else {}
 
 
 def _handle_post():
@@ -90,8 +110,20 @@ def _handle_post():
 @admins_only
 def overview():
     message = _handle_post() if request.method == "POST" else None
+    filters = Filters()
 
-    lockouts = LockoutEvent.query.order_by(LockoutEvent.date.desc()).limit(200).all()
+    lockouts = (
+        filters.query(
+            LockoutEvent.query,
+            users=(LockoutEvent.user_id,),
+            teams=(LockoutEvent.team_id,),
+            challenges=(LockoutEvent.challenge_id,),
+            ips=(LockoutEvent.ip,),
+        )
+        .order_by(LockoutEvent.date.desc())
+        .limit(200)
+        .all()
+    )
     for e in lockouts:
         e.team = Teams.query.get(e.team_id) if e.team_id else None
         e.user = Users.query.get(e.user_id) if e.user_id else None
@@ -99,8 +131,16 @@ def overview():
 
     challenge_names = dict(db.session.query(Challenges.id, Challenges.name).all())
     block_rows = []
-    for challenge_id, accounts in sorted(blocks.load_blocks().items()):
-        for account in sorted(accounts):
+    members = _members(filters)
+    for challenge_id, keys in sorted(blocks.load_blocks().items()):
+        for account in sorted(keys):
+            account_id = _int(account[1:])
+            if account.startswith("t"):
+                team_ids, user_ids = [account_id], members.get(account_id, [])
+            else:
+                team_ids, user_ids = [], [account_id]
+            if not filters.keep(user_ids, team_ids, [challenge_id], ips=None):
+                continue
             name, endpoint, args = _account_label(account)
             block_rows.append(
                 {
@@ -123,6 +163,7 @@ def overview():
         blocks=block_rows,
         challenges=sorted(challenge_names.items(), key=lambda c: c[1].lower()),
         teams_mode=teams_mode(),
+        filters=filters,
     )
 
 
@@ -145,7 +186,13 @@ def activity():
     else:
         message = handle_removal(ClientEvent)
 
-    query = ClientEvent.query
+    filters = Filters(("player", "team", "ip"))
+    query = filters.query(
+        ClientEvent.query,
+        users=(ClientEvent.user_id,),
+        teams=(ClientEvent.team_id,),
+        ips=(ClientEvent.ip,),
+    )
     kind = request.args.get("kind", "")
     if kind in ("ai", "api-token", "automation"):
         query = query.filter_by(kind=kind)
@@ -157,9 +204,13 @@ def activity():
     )
     events = pagination.items
     token_page = (
-        db.session.query(Tokens, Users)
-        .join(Users, Users.id == Tokens.user_id)
-        .filter(Users.type != "admin")
+        filters.query(
+            db.session.query(Tokens, Users)
+            .join(Users, Users.id == Tokens.user_id)
+            .filter(Users.type != "admin"),
+            users=(Users.id,),
+            teams=(Users.team_id,),
+        )
         .order_by(Tokens.id.desc())
         .paginate(
             page=max(1, request.args.get("token_page", 1, type=int)),
@@ -227,6 +278,7 @@ def activity():
         pagination=pagination,
         token_page=token_page,
         kind=kind,
+        filters=filters,
     )
 
 
@@ -234,6 +286,7 @@ def activity():
 @admins_only
 def devices():
     message = handle_removal(DeviceSession, DeviceSession.device_id)
+    filters = Filters(("player", "team", "ip"))
     shared = (
         db.session.query(DeviceSession.device_id)
         .group_by(DeviceSession.device_id)
@@ -268,13 +321,23 @@ def devices():
                 "last_seen": r.last_seen,
                 "ip": r.ip,
                 "user_agent": r.user_agent,
+                "ips": set(),
             },
         )
         d["rows"].append({"user": u, "last_seen": r.last_seen})
+        d["ips"].add(r.ip)
         d["teams"].add(u.team_id if teams_mode() else u.id)
         if r.last_seen > d["last_seen"]:
             d["last_seen"], d["ip"], d["user_agent"] = r.last_seen, r.ip, r.user_agent
-    newest_first = sorted(by_device.values(), key=lambda d: d["last_seen"], reverse=True)
+    newest_first = [
+        d
+        for d in sorted(by_device.values(), key=lambda d: d["last_seen"], reverse=True)
+        if filters.keep(
+            [row["user"].id for row in d["rows"]],
+            [row["user"].team_id for row in d["rows"]],
+            ips=d["ips"],
+        )
+    ]
     cross = [d for d in newest_first if len(d["teams"]) > 1]
     same = [d for d in newest_first if len(d["teams"]) == 1]
     for d in same:
@@ -290,6 +353,7 @@ def devices():
         ).scalar(),
         accounts_total=DeviceSession.query.count(),
         message=message,
+        filters=filters,
     )
 
 
@@ -326,7 +390,15 @@ def flag_sharing():
     ]
     names = {c["id"]: c["name"] for c in challenges}
 
-    pagination = FlagShare.query.order_by(FlagShare.date.desc()).paginate(
+    filters = Filters()
+    query = filters.query(
+        FlagShare.query,
+        users=(FlagShare.user_id, FlagShare.owner_user_id),
+        teams=(FlagShare.team_id, FlagShare.owner_team_id),
+        challenges=(FlagShare.challenge_id,),
+        ips=(FlagShare.ip,),
+    )
+    pagination = query.order_by(FlagShare.date.desc()).paginate(
         page=max(1, request.args.get("page", 1, type=int)), per_page=100, error_out=False
     )
     events = pagination.items
@@ -346,6 +418,7 @@ def flag_sharing():
         total=pagination.total,
         pagination=pagination,
         teams_mode=teams_mode(),
+        filters=filters,
     )
 
 
@@ -383,7 +456,17 @@ def fast_solves():
             fastsolves.save_ignored(known)
             message = "Fast solve settings saved."
 
-    found = fastsolves.bursts()
+    filters = Filters()
+    found = [
+        b
+        for b in fastsolves.bursts()
+        if filters.keep(
+            [b["user_id"]],
+            [b["team_id"]],
+            [s.challenge_id for s in b["solves"]],
+            ips=b["ips"],
+        )
+    ]
     per_page = 100
     pages = max(1, -(-len(found) // per_page))
     page = min(pages, max(1, request.args.get("page", 1, type=int)))
@@ -411,6 +494,81 @@ def fast_solves():
         pages=pages,
         users=users,
         teams=teams,
+        teams_mode=teams_mode(),
+        duration=_duration,
+        filters=filters,
+    )
+
+
+@blueprint.route("/admin/warden/accounts")
+@admins_only
+def accounts_list():
+    filters = Filters(("player", "team", "ip"))
+    counts = accounts.summary()
+    ids = accounts.matching(filters) if filters.active else set(counts)
+    model = accounts.model()
+    names = dict(db.session.query(model.id, model.name).filter(model.id.in_(ids))) if ids else {}
+    rows = []
+    for account_id, name in names.items():
+        found = counts.get(account_id, {})
+        rows.append({"id": account_id, "name": name, "counts": found, "total": sum(found.values())})
+    rows.sort(key=lambda r: (-r["total"], r["name"].lower()))
+    per_page = 100
+    pages = max(1, -(-len(rows) // per_page))
+    page = min(pages, max(1, request.args.get("page", 1, type=int)))
+    shown = rows[(page - 1) * per_page : page * per_page]
+    found = _lookup(model, [row["id"] for row in shown])
+    for row in shown:
+        row["account"] = found[row["id"]]
+    return render_template(
+        template("admin_accounts.html"),
+        rows=shown,
+        total=len(rows),
+        page=page,
+        pages=pages,
+        columns=accounts.COLUMNS,
+        teams_mode=teams_mode(),
+        filters=filters,
+    )
+
+
+@blueprint.route("/admin/warden/accounts/<int:account_id>", methods=["GET", "POST"])
+@admins_only
+def account(account_id):
+    target = accounts.model().query.filter_by(id=account_id).first_or_404()
+    key = f"{'t' if teams_mode() else 'u'}{account_id}"
+    message = None
+    if request.method == "POST":
+        action = request.form.get("action")
+        challenge_id = _int(request.form.get("challenge_id"))
+        if action == "add-block" and Challenges.query.filter_by(id=challenge_id).first():
+            blocks.add_block(challenge_id, key)
+            message = "Challenge blocked."
+        elif action == "remove-block" and challenge_id:
+            blocks.remove_block(challenge_id, key)
+            message = "Block removed."
+    data = accounts.detail(account_id)
+
+    user_ids = {m.id for m in data["members"]}
+    user_ids |= {e.user_id for e in data["events"] + data["lockouts"]}
+    user_ids |= {i for e in data["copied"] + data["sources"] for i in (e.user_id, e.owner_user_id)}
+    user_ids |= {b["user_id"] for b in data["bursts"]}
+    user_ids |= {u for d in data["devices"] for u in d["users"]}
+    account_ids = {i for d in data["devices"] for i in d["others"]}
+    account_ids |= {i for r in data["ips"] for i in r["others"]}
+    for e in data["copied"] + data["sources"]:
+        if teams_mode():
+            account_ids |= {e.team_id, e.owner_team_id}
+        else:
+            account_ids |= {e.user_id, e.owner_user_id}
+    return render_template(
+        template("admin_account.html"),
+        target=target,
+        message=message,
+        data=data,
+        users=_lookup(Users, user_ids),
+        others=_lookup(accounts.model(), account_ids),
+        names=dict(db.session.query(Challenges.id, Challenges.name).all()),
         teams_mode=teams_mode(),
         duration=_duration,
     )

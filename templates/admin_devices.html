@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from warden_filters import filter_bar with context %}
 
 {% macro remove(device_id) -%}
 <form method="POST" class="d-inline"><input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="remove"><input type="hidden" name="id" value="{{ device_id }}"><button type="submit" class="btn btn-sm btn-outline-secondary py-0">Remove</button></form>
@@ -25,6 +26,7 @@
     {{ devices_total }} devices seen, {{ accounts_total }} device/account pairs,
     <b>{{ cross_team | length }}</b> device{{ '' if cross_team | length == 1 else 's' }} shared across {{ 'teams' if teams_mode else 'accounts' }}.
   </p>
+  {{ filter_bar(filters, 'warden.devices') }}
   <form method="POST" class="mb-4" onsubmit="return confirm('Remove every device record?');">
     <input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="clear">
     <button type="submit" class="btn btn-sm btn-outline-danger">Clear all device records</button>
@@ -41,8 +43,8 @@
         <td><code>{{ d.device_id[:12] }}&hellip;</code></td>
         <td>
           {% for row in d.rows %}
-            <a href="{{ url_for('admin.users_detail', user_id=row.user.id) }}">{{ row.user.name }}</a>
-            {% if teams_mode %}({% if row.user.team %}<a href="{{ url_for('admin.teams_detail', team_id=row.user.team.id) }}">{{ row.user.team.name }}</a>{% else %}no team{% endif %}){% endif %}
+            <a href="{{ warden_user_url(row.user.id) }}">{{ row.user.name }}</a>
+            {% if teams_mode %}({% if row.user.team %}<a href="{{ url_for('warden.account', account_id=row.user.team.id) }}">{{ row.user.team.name }}</a>{% else %}no team{% endif %}){% endif %}
             {% if not loop.last %}<br>{% endif %}
           {% endfor %}
         </td>
@@ -67,7 +69,7 @@
       {% for d in same_team %}
       <tr class="text-muted">
         <td><code>{{ d.device_id[:12] }}&hellip;</code></td>
-        <td>{% if d.team %}<a href="{{ url_for('admin.teams_detail', team_id=d.team.id) }}">{{ d.team.name }}</a>{% else %}no team{% endif %}</td>
+        <td>{% if d.team %}<a href="{{ url_for('warden.account', account_id=d.team.id) }}">{{ d.team.name }}</a>{% else %}no team{% endif %}</td>
         <td>{% for row in d.rows %}{{ row.user.name }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
         <td class="text-nowrap">{{ d.last_seen.strftime('%m-%d %H:%M') }} UTC</td>
         <td>{{ remove(d.device_id) }}</td>

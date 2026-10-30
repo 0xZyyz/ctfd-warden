@@ -1,8 +1,9 @@
 {% extends "admin/base.html" %}
+{% from warden_filters import filter_bar with context %}
 
 {% macro account(team_id, user_id) -%}
-{% if teams_mode and team_id in teams %}<a href="{{ url_for('admin.teams_detail', team_id=team_id) }}">{{ teams[team_id].name }}</a>{% elif teams_mode %}Deleted team{% endif %}
-{%- if user_id in users %}<small class="d-block text-muted"><a class="text-muted" href="{{ url_for('admin.users_detail', user_id=user_id) }}">{{ users[user_id].name }}</a></small>{% elif not teams_mode %}Deleted user{% endif %}
+{% if teams_mode and team_id in teams %}<a href="{{ url_for('warden.account', account_id=team_id) }}">{{ teams[team_id].name }}</a>{% elif teams_mode %}Deleted team{% endif %}
+{%- if user_id in users %}<small class="d-block text-muted"><a class="text-muted" href="{{ warden_user_url(user_id) }}">{{ users[user_id].name }}</a></small>{% elif not teams_mode %}Deleted user{% endif %}
 {%- endmacro %}
 
 {% block content %}
@@ -47,6 +48,7 @@
     {% endif %}
   </form>
 
+  {{ filter_bar(filters, 'warden.flag_sharing', 'Filter shared flags') }}
   <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
     <h3 class="mb-0">Shared flags <span class="text-muted h5">({{ total }})</span></h3>
     <form method="POST" class="mb-0">
@@ -71,9 +73,9 @@
   </table></div>
   {% if pagination.pages > 1 %}
   <nav class="d-flex align-items-center my-3" aria-label="Pagination">
-    {% if pagination.has_prev %}<a class="btn btn-sm btn-outline-secondary mr-3" href="{{ url_for('warden.flag_sharing', page=pagination.prev_num) }}">Previous</a>{% endif %}
+    {% if pagination.has_prev %}<a class="btn btn-sm btn-outline-secondary mr-3" href="{{ url_for('warden.flag_sharing', page=pagination.prev_num, **filters.args()) }}">Previous</a>{% endif %}
     <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
-    {% if pagination.has_next %}<a class="btn btn-sm btn-outline-secondary ml-3" href="{{ url_for('warden.flag_sharing', page=pagination.next_num) }}">Next</a>{% endif %}
+    {% if pagination.has_next %}<a class="btn btn-sm btn-outline-secondary ml-3" href="{{ url_for('warden.flag_sharing', page=pagination.next_num, **filters.args()) }}">Next</a>{% endif %}
   </nav>
   {% endif %}
   {% if events %}

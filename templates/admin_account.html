@@ -1,0 +1,171 @@
+{% extends "admin/base.html" %}
+
+{% macro other(account_id) -%}
+{% if account_id in others %}<a href="{{ url_for('warden.account', account_id=account_id) }}">{{ others[account_id].name }}</a>{% else %}Deleted {{ 'team' if teams_mode else 'player' }}{% endif %}
+{%- endmacro %}
+
+{% macro member(user_id) -%}
+{% if user_id in users %}<a href="{{ url_for('admin.users_detail', user_id=user_id) }}">{{ users[user_id].name }}</a>{% else %}Deleted player{% endif %}
+{%- endmacro %}
+
+{% macro challenge(challenge_id) -%}
+{% if challenge_id in names %}<a href="{{ url_for('admin.challenges_detail', challenge_id=challenge_id) }}">{{ names[challenge_id] }}</a>{% else %}#{{ challenge_id }}{% endif %}
+{%- endmacro %}
+
+{% macro section(title, count, anchor) -%}
+<h4 class="mt-5" id="{{ anchor }}">{{ title }} <span class="text-muted h6">({{ count }})</span></h4>
+{%- endmacro %}
+
+{% macro nonce(action) -%}
+<input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="{{ action }}">
+{%- endmacro %}
+
+{% block content %}
+{% set kind = 'team' if teams_mode else 'player' %}
+{% set filter_args = {'team': target.name} if teams_mode else {'player': target.name} %}
+<div class="jumbotron">
+  <div class="container">
+    <h1>{{ target.name }}</h1>
+    <p>
+      {{ 'Team' if teams_mode else 'Player' }}
+      {% if target.banned %}<span class="badge badge-danger">banned</span>{% endif %}
+      {% if target.hidden %}<span class="badge badge-secondary">hidden</span>{% endif %}
+    </p>
+  </div>
+</div>
+<div class="container">
+  {% include warden_nav %}
+  {% if message %}<div class="alert alert-info" role="status">{{ message }}</div>{% endif %}
+
+  <p>
+    <a class="btn btn-outline-primary btn-sm mr-2" href="{{ url_for('admin.teams_detail', team_id=target.id) if teams_mode else url_for('admin.users_detail', user_id=target.id) }}">Open in CTFd</a>
+    {% if teams_mode %}Members:
+      {% for m in data.members %}{{ member(m.id) }}{% if not loop.last %}, {% endif %}{% else %}<span class="text-muted">none</span>{% endfor %}
+    {% endif %}
+  </p>
+
+  <div class="d-flex flex-wrap mb-2">
+    {% for label, n, anchor, cls in [
+      ('Copied flags', data.copied | length, 'sharing', 'danger'),
+      ('Flags copied from them', data.sources | length, 'sharing', 'warning'),
+      ('Fast solves', data.bursts | length, 'fast', 'warning'),
+      ('Shared devices', data.devices | selectattr('others') | list | length, 'devices', 'danger'),
+      ('Lockouts', data.lockouts | length, 'lockouts', 'warning'),
+      ('Clients', data.clients | length, 'activity', 'secondary'),
+      ('Blocked challenges', data.blocked | length, 'blocks', 'warning'),
+    ] %}
+    <a href="#{{ anchor }}" class="mr-3 mb-2 text-decoration-none"><span class="badge badge-{{ cls if n else 'light' }} p-2">{{ n }}</span> <span class="text-muted">{{ label }}</span></a>
+    {% endfor %}
+  </div>
+
+  {{ section('Flag sharing', data.copied | length + data.sources | length, 'sharing') }}
+  {% if data.copied or data.sources %}
+  <div class="table-responsive"><table class="table table-sm">
+    <thead><tr><th>Time (UTC)</th><th>Challenge</th><th>What happened</th><th>Result</th><th>Flag</th></tr></thead>
+    <tbody>
+      {% for e in data.copied %}<tr class="table-danger">
+        <td class="text-nowrap">{{ e.date.strftime('%m-%d %H:%M:%S') }}</td>
+        <td>{{ challenge(e.challenge_id) }}</td>
+        <td>{{ member(e.user_id) }} submitted the flag of {{ other(e.owner_team_id if teams_mode else e.owner_user_id) }}</td>
+        <td><span class="badge {{ 'badge-danger' if e.status in ('correct', 'already_solved') else 'badge-warning' }}">{{ e.status }}</span></td>
+        <td><code class="small">{{ e.flag }}</code></td>
+      </tr>{% endfor %}
+      {% for e in data.sources %}<tr>
+        <td class="text-nowrap">{{ e.date.strftime('%m-%d %H:%M:%S') }}</td>
+        <td>{{ challenge(e.challenge_id) }}</td>
+        <td>{{ other(e.team_id if teams_mode else e.user_id) }} submitted this {{ kind }}'s flag</td>
+        <td><span class="badge {{ 'badge-danger' if e.status in ('correct', 'already_solved') else 'badge-warning' }}">{{ e.status }}</span></td>
+        <td><code class="small">{{ e.flag }}</code></td>
+      </tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="text-muted">No shared flags.</p>{% endif %}
+
+  {{ section('Fast solves', data.bursts | length, 'fast') }}
+  {% if data.bursts %}
+  <div class="table-responsive"><table class="table table-sm">
+    <thead><tr><th>Player</th><th>Time (UTC)</th><th>Solves</th><th>Challenges</th></tr></thead>
+    <tbody>{% for b in data.bursts %}<tr>
+      <td>{{ member(b.user_id) }}</td>
+      <td class="text-nowrap">{{ b.start.strftime('%m-%d %H:%M:%S') }} &ndash; {{ b.end.strftime('%H:%M:%S') }}</td>
+      <td><span class="badge badge-warning">{{ b.solves | length }} in {{ duration(b.seconds) }}</span></td>
+      <td>{% for s in b.solves %}{{ challenge(s.challenge_id) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="text-muted">No solve bursts.</p>{% endif %}
+
+  {{ section('Shared devices', data.devices | length, 'devices') }}
+  {% if data.devices %}
+  <div class="table-responsive"><table class="table table-sm">
+    <thead><tr><th>Device</th><th>Used by</th><th>Other {{ 'teams' if teams_mode else 'players' }}</th><th>Last seen</th><th>Last IP / browser</th></tr></thead>
+    <tbody>{% for d in data.devices %}<tr class="{{ 'table-danger' if d.others else 'text-muted' }}">
+      <td><code>{{ d.device_id[:12] }}&hellip;</code></td>
+      <td>{% for u in d.users %}{{ member(u) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+      <td>{% for a in d.others %}{{ other(a) }}{% if not loop.last %}, {% endif %}{% else %}&mdash;{% endfor %}</td>
+      <td class="text-nowrap">{{ d.last_seen.strftime('%m-%d %H:%M') }}</td>
+      <td><small>{{ d.ip }}<br><span class="text-muted">{{ (d.user_agent or '')[:60] }}</span></small></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="text-muted">No device shared with another account.</p>{% endif %}
+
+  {{ section('IP addresses', data.ips | length, 'ips') }}
+  <p class="text-muted small">From solves and device records. A shared IP is a weak signal: a university, a lab or a VPN often puts many people behind one address.</p>
+  {% if data.ips %}
+  <div class="table-responsive"><table class="table table-sm">
+    <thead><tr><th>IP</th><th>Used by</th><th>Also used by</th></tr></thead>
+    <tbody>{% for r in data.ips %}<tr>
+      <td><a href="{{ url_for('warden.accounts_list', ip=r.ip) }}"><code>{{ r.ip }}</code></a></td>
+      <td>{% for u in r.users %}{{ member(u) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+      <td>{% for a in r.others %}{{ other(a) }}{% if not loop.last %}, {% endif %}{% else %}<span class="text-muted">&mdash;</span>{% endfor %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="text-muted">No IP recorded yet.</p>{% endif %}
+
+  {{ section('Client activity', data.clients | length, 'activity') }}
+  {% if data.clients %}
+  <div class="table-responsive"><table class="table table-sm">
+    <thead><tr><th>Signal</th><th>Client</th><th>Requests logged</th><th>Last seen (UTC)</th></tr></thead>
+    <tbody>{% for kind_, label, n, last in data.clients %}<tr>
+      <td><span class="badge badge-secondary">{{ kind_ }}</span></td><td>{{ label }}</td><td>{{ n }}</td><td>{{ last.strftime('%m-%d %H:%M:%S') }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <details class="mb-2"><summary>Latest {{ data.events | length }} requests</summary>
+    <div class="table-responsive"><table class="table table-sm mt-2">
+      <thead><tr><th>Time (UTC)</th><th>Player</th><th>Client</th><th>Request</th><th>IP</th></tr></thead>
+      <tbody>{% for e in data.events %}<tr>
+        <td class="text-nowrap">{{ e.date.strftime('%m-%d %H:%M:%S') }}</td><td>{{ member(e.user_id) }}</td><td>{{ e.label }}</td>
+        <td><code>{{ e.method }} {{ e.path or '' }}</code></td><td>{{ e.ip }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </details>
+  {% else %}<p class="text-muted">No AI client, script or API token seen.</p>{% endif %}
+  <p class="small"><a href="{{ url_for('warden.activity', **filter_args) }}">All client activity of this {{ kind }}</a> &middot; {{ data.tokens }} API token{{ '' if data.tokens == 1 else 's' }}</p>
+
+  {{ section('Lockouts', data.lockouts | length, 'lockouts') }}
+  {% if data.lockouts %}
+  <div class="table-responsive"><table class="table table-sm">
+    <thead><tr><th>Time (UTC)</th><th>Triggered by</th><th>Challenge</th><th>Wrong attempts</th><th>IP</th></tr></thead>
+    <tbody>{% for e in data.lockouts %}<tr>
+      <td class="text-nowrap">{{ e.date.strftime('%m-%d %H:%M:%S') }}</td><td>{{ member(e.user_id) }}</td>
+      <td>{{ challenge(e.challenge_id) }}</td><td>{{ e.attempts }}</td><td>{{ e.ip }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="text-muted">Never locked out.</p>{% endif %}
+
+  {{ section('Blocked challenges', data.blocked | length, 'blocks') }}
+  {% if data.blocked %}
+  <table class="table table-sm"><tbody>{% for c in data.blocked %}<tr>
+    <td>{{ challenge(c) }}</td>
+    <td class="text-right"><form method="POST" class="d-inline">{{ nonce('remove-block') }}<input type="hidden" name="challenge_id" value="{{ c }}"><button type="submit" class="btn btn-sm btn-outline-secondary py-0">Unblock</button></form></td>
+  </tr>{% endfor %}</tbody></table>
+  {% else %}<p class="text-muted">No challenge is blocked for this {{ kind }}.</p>{% endif %}
+  <form method="POST" class="form-inline mb-5">
+    {{ nonce('add-block') }}
+    <label class="mr-2" for="block-challenge">Block a challenge</label>
+    <select class="form-control mr-2" id="block-challenge" name="challenge_id" required>
+      {% for id, name in names | dictsort(by='value') %}{% if id not in data.blocked %}<option value="{{ id }}">{{ name }}</option>{% endif %}{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-danger">Block</button>
+  </form>
+</div>
+{% endblock %}

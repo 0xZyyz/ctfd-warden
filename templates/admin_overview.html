@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from warden_filters import filter_bar with context %}
 
 {% macro nonce(action) -%}
 <input type="hidden" name="nonce" value="{{ Session.nonce }}"><input type="hidden" name="action" value="{{ action }}">
@@ -32,6 +33,8 @@
 
   <hr class="my-5">
 
+  {{ filter_bar(filters, 'warden.overview', 'Filter lockouts and blocks') }}
+
   <h3>Flag brute-force lockout {% if not enabled.flag_lockout %}<span class="badge badge-secondary">off</span>{% endif %}</h3>
   <p>
     On top of CTFd's per-IP limit, a {{ 'team' if teams_mode else 'user' }} that submits too many wrong flags on one
@@ -61,8 +64,8 @@
       {% for e in lockouts %}
       <tr>
         <td class="text-nowrap">{{ e.date.strftime('%m-%d %H:%M:%S') }}</td>
-        <td>{% if e.team %}<a href="{{ url_for('admin.teams_detail', team_id=e.team.id) }}">{{ e.team.name }}</a>{% else %}&mdash;{% endif %}</td>
-        <td>{% if e.user %}<a href="{{ url_for('admin.users_detail', user_id=e.user.id) }}">{{ e.user.name }}</a>{% else %}&mdash;{% endif %}</td>
+        <td>{% if e.team %}<a href="{{ url_for('warden.account', account_id=e.team.id) }}">{{ e.team.name }}</a>{% else %}&mdash;{% endif %}</td>
+        <td>{% if e.user %}<a href="{{ warden_user_url(e.user.id) }}">{{ e.user.name }}</a>{% else %}&mdash;{% endif %}</td>
         <td>{% if e.challenge %}<a href="{{ url_for('admin.challenges_detail', challenge_id=e.challenge.id) }}">{{ e.challenge.name }}</a>{% else %}#{{ e.challenge_id }}{% endif %}</td>
         <td>{{ e.attempts }}</td>
         <td>{{ e.ip }}</td>

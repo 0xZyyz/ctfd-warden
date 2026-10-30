@@ -12,7 +12,7 @@ from CTFd.plugins.migrations import upgrade
 from CTFd.utils.user import authed, get_current_user, is_admin
 
 from . import activity, admin, blocks, devices, lockout, privacy, settings, sharing
-from .common import ASSETS, PLUGIN_NAME, blueprint, request_path, template
+from .common import ASSETS, PLUGIN_NAME, blueprint, request_path, teams_mode, template, user_url
 
 log = logging.getLogger("warden")
 
@@ -79,3 +79,6 @@ def load(app):
     app.after_request(_after_request)
     register_admin_plugin_menu_bar("Warden", "/admin/warden")
     app.jinja_env.globals["warden_nav"] = template("_nav.html")
+    app.jinja_env.globals["warden_filters"] = template("_filters.html")
+    app.jinja_env.globals["warden_teams_mode"] = teams_mode
+    app.jinja_env.globals["warden_user_url"] = user_url

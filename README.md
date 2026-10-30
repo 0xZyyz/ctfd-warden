@@ -15,7 +15,8 @@ Copy one folder into CTFd, restart, done. No theme changes, no CTFd core patches
 
 ## Features
 
-Every feature can be switched on or off from **Admin → Warden**, without a restart.
+Every feature can be switched on or off from **Admin → Warden**, without a restart. Every page can
+be filtered by player name, team name, challenge name and IP address.
 
 | Feature | Default | What it does |
 | --- | --- | --- |
@@ -24,6 +25,7 @@ Every feature can be switched on or off from **Admin → Warden**, without a res
 | **Flag brute-force lockout** | on | A team (or user) that submits too many wrong flags on one challenge is locked out of that challenge for a while. Threshold, window and duration are configurable. |
 | **Flag sharing** | on | For challenges you mark as having unique flags (an instancer, or a remote service that prints a per-session suffix accepted by a regex flag), reports the same flag submitted by two teams: who had it first, who reused it, and whether CTFd accepted it. A scan button checks everything submitted before, so you can audit a finished event too. |
 | **Fast solves** | always available | Lists players who solved several challenges in a short time, by default 3 within 2 minutes, with the challenges and times. It reads CTFd's own solves, so it also works on a finished event. The numbers are configurable, and challenges meant to be instant, like a welcome flag, can be ignored. |
+| **Team pages** | always available | One page per team (or player, in users mode) with everything Warden found about it: flags it copied and flags copied from it, solve bursts, devices and IP addresses shared with other teams, AI and script activity, lockouts and blocks. A **Teams** tab ranks teams by how many signals they have. |
 | **Challenge blocks** | always available | Bar one team or user from one challenge, e.g. after revoking a solve for flag sharing. The challenge disappears from their list and submissions are refused. |
 | **Team privacy** | off | Hides team rosters, member countries and the user list from other players. Admins and the team itself still see everything. |
 
@@ -38,8 +40,8 @@ Every feature can be switched on or off from **Admin → Warden**, without a res
 | ![Overview: feature switches, lockouts and challenge blocks](docs/screenshots/overview.png) | ![Client activity: AI agents, scripts and API tokens](docs/screenshots/client-activity.png) |
 | **Shared devices** | **Flag sharing** |
 | ![Shared devices: one browser used by two teams](docs/screenshots/shared-devices.png) | ![Flag sharing: a unique flag submitted by two teams](docs/screenshots/flag-sharing.png) |
-| **Fast solves** | |
-| ![Fast solves: four challenges solved in twelve seconds](docs/screenshots/fast-solves.png) | |
+| **Fast solves** | **Team page** |
+| ![Fast solves: four challenges solved in twelve seconds](docs/screenshots/fast-solves.png) | ![Team page: every signal about one team](docs/screenshots/team.png) |
 
 ## Install
 

@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from warden_filters import filter_bar with context %}
 
 {% macro pager(p, key) %}
   {% if p.pages > 1 %}
@@ -31,20 +32,16 @@
     and automation are normal CTF tools. Similar requests are sampled once per user and client every ten minutes.
   </p>
 
-  <form method="GET" class="form-inline mb-4">
-    <label class="mr-2" for="kind">Signal</label>
-    <select id="kind" name="kind" class="form-control mr-3">
+  {% call filter_bar(filters, 'warden.activity') %}
+    <label class="sr-only" for="kind">Signal</label>
+    <select id="kind" name="kind" class="form-control mr-2 mb-2">
       <option value="">All signals</option>
       {% for value, label in [('ai', 'AI client'), ('api-token', 'API token'), ('automation', 'Automation')] %}
       <option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
-    <label class="mr-2" for="user_id">User ID</label>
-    <input type="number" min="1" id="user_id" name="user_id" class="form-control mr-3" style="width:8em" value="{{ request.args.get('user_id', '') }}">
-    <button class="btn btn-primary mr-2" type="submit">Filter</button>
-    <a class="btn btn-outline-secondary" href="{{ url_for('warden.activity') }}">Reset</a>
-    <span class="ml-auto text-muted">{{ total }} matching events</span>
-  </form>
+  {% endcall %}
+  <p class="text-muted mb-4">{{ total }} matching event{{ '' if total == 1 else 's' }}</p>
 
   <details class="mb-4">
     <summary>Player access tokens <span class="text-muted">({{ token_page.total }})</span></summary>
@@ -52,7 +49,7 @@
     <div class="table-responsive"><table class="table table-hover">
       <thead><tr><th>Player / team</th><th>Created (UTC)</th><th>Expiry</th><th>Description</th><th></th></tr></thead>
       <tbody>{% for t in tokens %}<tr>
-        <td><a href="{{ url_for('admin.users_detail', user_id=t.user.id) }}">{{ t.user.name }}</a>{% if t.team %}<small class="d-block text-muted">{{ t.team.name }}</small>{% endif %}</td>
+        <td><a href="{{ warden_user_url(t.user.id) }}">{{ t.user.name }}</a>{% if t.team %}<small class="d-block text-muted">{{ t.team.name }}</small>{% endif %}</td>
         <td>{{ t.created.strftime('%Y-%m-%d %H:%M') if t.created }}</td>
         <td>{{ 'Expired' if t.expired else (t.expiration.strftime('%Y-%m-%d') if t.expiration else 'No expiry') }}</td>
         <td>{{ t.description or '—' }}</td>
@@ -67,7 +64,7 @@
     <div class="table-responsive"><table class="table mt-2">
       <thead><tr><th>Account</th><th>AI client</th><th>API token</th><th>Automation</th><th>Clients</th></tr></thead>
       <tbody>{% for row in summary %}<tr>
-        <td>{% if row.team %}<a href="{{ url_for('admin.teams_detail', team_id=row.team.id) }}">{{ row.team.name }}</a>{% elif row.user %}<a href="{{ url_for('admin.users_detail', user_id=row.user.id) }}">{{ row.user.name }}</a>{% else %}Deleted account{% endif %}</td>
+        <td>{% if row.team %}<a href="{{ url_for('warden.account', account_id=row.team.id) }}">{{ row.team.name }}</a>{% elif row.user %}<a href="{{ warden_user_url(row.user.id) }}">{{ row.user.name }}</a>{% else %}Deleted account{% endif %}</td>
         <td>{{ row.ai }}</td><td>{{ row.token }}</td><td>{{ row.auto }}</td><td>{{ row.labels | join(', ') }}</td>
       </tr>{% endfor %}</tbody>
     </table></div>
@@ -79,7 +76,7 @@
     <tbody>{% for e in events %}<tr>
       <td class="text-nowrap">{{ e.date.strftime('%m-%d %H:%M:%S') }}</td>
       <td><span class="badge badge-secondary">{{ e.kind }}</span><span class="d-block mt-1">{{ e.label }}</span></td>
-      <td>{% if e.user_id in users %}<a href="{{ url_for('admin.users_detail', user_id=e.user_id) }}">{{ users[e.user_id].name }}</a>{% else %}Deleted account{% endif %}{% if e.team_id in teams %}<small class="d-block text-muted">{{ teams[e.team_id].name }}</small>{% endif %}</td>
+      <td>{% if e.user_id in users %}<a href="{{ warden_user_url(e.user_id) }}">{{ users[e.user_id].name }}</a>{% else %}Deleted account{% endif %}{% if e.team_id in teams %}<small class="d-block"><a class="text-muted" href="{{ url_for('warden.account', account_id=e.team_id) }}">{{ teams[e.team_id].name }}</a></small>{% endif %}</td>
       <td><code>{{ e.method }} {{ e.path or '' }}</code></td>
       <td><details><summary>Inspect</summary>
         <dl class="small mt-2 mb-2">

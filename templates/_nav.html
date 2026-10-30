@@ -4,11 +4,12 @@
   ('warden.devices', 'Shared devices'),
   ('warden.flag_sharing', 'Flag sharing'),
   ('warden.fast_solves', 'Fast solves'),
+  ('warden.accounts_list', 'Teams' if warden_teams_mode() else 'Players'),
 ] %}
 <ul class="nav nav-pills mb-4">
   {% for endpoint, label in warden_pages %}
   <li class="nav-item">
-    <a class="nav-link {% if request.endpoint == endpoint %}active{% endif %}" href="{{ url_for(endpoint) }}">{{ label }}</a>
+    <a class="nav-link {% if request.endpoint == endpoint or (endpoint == 'warden.accounts_list' and request.endpoint == 'warden.account') %}active{% endif %}" href="{{ url_for(endpoint) }}">{{ label }}</a>
   </li>
   {% endfor %}
 </ul>

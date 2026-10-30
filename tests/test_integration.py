@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from CTFd.models import Flags, Teams, Users, db
-from CTFd.plugins.warden import blocks, fastsolves, settings, sharing
+from CTFd.plugins.warden import accounts, blocks, fastsolves, settings, sharing
 from CTFd.plugins.warden.models import ClientEvent, DeviceSession, FlagShare, LockoutEvent
 from CTFd.utils.security.auth import generate_user_token
 from tests.helpers import (
@@ -352,6 +352,7 @@ def test_admin_pages_render_and_save(app):
             "/admin/warden/devices",
             "/admin/warden/sharing",
             "/admin/warden/fast-solves",
+            "/admin/warden/accounts",
         ):
             assert client.get(path).status_code == 200, path
 
@@ -395,6 +396,8 @@ def test_admin_pages_are_admin_only(app):
             "/admin/warden/devices",
             "/admin/warden/sharing",
             "/admin/warden/fast-solves",
+            "/admin/warden/accounts",
+            "/admin/warden/accounts/1",
         ):
             assert client.get(path).status_code in (302, 403), path
 
@@ -499,3 +502,139 @@ def test_fast_solves_admin_page(app):
     with app.app_context():
         assert fastsolves.settings() == {"count": 3, "seconds": 60}
         assert fastsolves.ignored() == {ids[0]}
+
+
+def two_teams(app):
+    with app.app_context():
+        ids = {}
+        for team_name, members in (("Redteam", ("r1", "r2")), ("Blueteam", ("b1",))):
+            team = gen_team(db, name=team_name, email=f"{team_name}@example.test", member_count=0)
+            ids[team_name] = team.id
+            for name in members:
+                ids[name] = gen_user(
+                    db, name=name, email=f"{name}@example.test", team_id=team.id, verified=True
+                ).id
+        unique = gen_challenge(db, name="Uniqueone").id
+        gen_flag(db, challenge_id=unique, content=UNIQUE, type="regex")
+        sharing.save_watched([unique])
+        ids["unique"] = unique
+        ids["statics"] = [gen_challenge(db, name=f"Static{i}").id for i in range(3)]
+        db.session.add(DeviceSession(device_id="d" * 32, user_id=ids["r1"], ip="203.0.113.9"))
+        db.session.add(DeviceSession(device_id="d" * 32, user_id=ids["b1"], ip="198.51.100.5"))
+        db.session.add(
+            LockoutEvent(
+                team_id=ids["Blueteam"], user_id=ids["b1"], challenge_id=ids["statics"][0],
+                ip="198.51.100.5", attempts=60,
+            )
+        )
+        db.session.commit()
+        blocks.add_block(ids["statics"][0], f"t{ids['Blueteam']}")
+        start = datetime(2030, 1, 1, 12, 0, 0)
+        for i, chal in enumerate(ids["statics"]):
+            solve_at(ids["r2"], chal, start + timedelta(seconds=10 * i), ids["Redteam"])
+    flag = "flag{unique_00112233aabbccdd}"
+    with login_as_user(app, name="r1") as client:
+        assert submit(client, ids["unique"], flag) == "correct"
+        client.get("/api/v1/challenges", headers={"User-Agent": "curl/8.10.1"})
+    with login_as_user(app, name="b1") as client:
+        assert submit(client, ids["unique"], flag) == "correct"
+        client.get("/api/v1/challenges", headers={"User-Agent": "python-requests/2.32.3"})
+    return ids
+
+
+def test_team_page_collects_every_signal(teams_app):
+    app = teams_app
+    ids = two_teams(app)
+    red, blue = ids["Redteam"], ids["Blueteam"]
+    with app.app_context():
+        counts = accounts.summary()
+        assert dict(counts[red]) == {"flag_sources": 1, "devices": 1, "bursts": 1, "automation": 1}
+        assert dict(counts[blue]) == {
+            "shared_flags": 1, "devices": 1, "lockouts": 1, "blocks": 1, "automation": 1,
+        }
+    with login_as_user(app, name="admin") as client:
+        page = client.get("/admin/warden/accounts").data
+        assert b"Redteam" in page and b"Blueteam" in page and b">Teams</a>" in page
+        page = client.get("/admin/warden/accounts?team=blue").data
+        assert b"Blueteam" in page and b"Redteam" not in page
+        page = client.get("/admin/warden/accounts?player=r2").data
+        assert b"Redteam" in page and b"Blueteam" not in page
+        page = client.get("/admin/warden/accounts?ip=198.51.100").data
+        assert b"Blueteam" in page and b"Redteam" not in page
+
+        page = client.get(f"/admin/warden/accounts/{red}").data.decode()
+        assert "submitted this team's flag" in page and "Blueteam" in page
+        assert "3 in 20 s" in page and "curl" in page and "203.0.113.9" in page
+        page = client.get(f"/admin/warden/accounts/{blue}").data.decode()
+        assert "submitted the flag of" in page and "Static0" in page and "60" in page
+        assert client.get("/admin/warden/accounts/9999").status_code == 404
+
+        static = ids["statics"][1]
+        r = client.post(
+            f"/admin/warden/accounts/{red}",
+            data={"nonce": nonce(client), "action": "add-block", "challenge_id": static},
+        )
+        assert b"Challenge blocked" in r.data
+        with app.app_context():
+            assert f"t{red}" in blocks.load_blocks()[static]
+        client.post(
+            f"/admin/warden/accounts/{red}",
+            data={"nonce": nonce(client), "action": "remove-block", "challenge_id": static},
+        )
+        with app.app_context():
+            assert f"t{red}" not in blocks.load_blocks().get(static, set())
+
+
+def section(html, start, end):
+    return html.split(start, 1)[1].split(end, 1)[0]
+
+
+def test_filters_on_every_page(teams_app):
+    app = teams_app
+    ids = two_teams(app)
+    with login_as_user(app, name="admin") as client:
+        get = lambda path: client.get(path).data.decode()
+
+        page = section(get("/admin/warden/activity?player=r1"), "Request history", "Bulk actions")
+        assert "curl" in page and "python-requests" not in page
+        page = section(get("/admin/warden/activity?team=Blue"), "Request history", "Bulk actions")
+        assert "python-requests" in page and "curl" not in page
+
+        page = section(get("/admin/warden/devices?ip=203.0.113"), "Devices shared", "</table>")
+        assert "r1" in page and "b1" in page
+        page = get("/admin/warden/devices?player=nobody")
+        assert "No device has been used" in page
+
+        page = section(get("/admin/warden/sharing?team=Red"), "Shared flags", "</table>")
+        assert "Uniqueone" in page
+        page = section(get("/admin/warden/sharing?challenge=static"), "Shared flags", "</table>")
+        assert "No shared flags found" in page
+
+        page = section(get("/admin/warden/fast-solves?challenge=Static1"), "Solve bursts", "</table>")
+        assert "r2" in page
+        page = section(get("/admin/warden/fast-solves?team=Blue"), "Solve bursts", "</table>")
+        assert "No solve bursts found" in page
+
+        page = section(get("/admin/warden?challenge=Static0"), "Flag brute-force lockout", "Challenge blocks")
+        assert "b1" in page
+        page = get("/admin/warden?player=r1")
+        assert "Nobody has been locked out" in page and "No challenge is blocked" in page
+        page = section(get("/admin/warden?team=Blue"), "Challenge blocks", "</table>")
+        assert "Blueteam" in page and "Static0" in page
+
+
+def test_player_pages_in_users_mode(app):
+    alice, bob = player(app, name="alice"), player(app, name="bob")
+    with app.app_context():
+        db.session.add(DeviceSession(device_id="e" * 32, user_id=alice, ip="203.0.113.5"))
+        db.session.add(DeviceSession(device_id="e" * 32, user_id=bob, ip="203.0.113.5"))
+        db.session.commit()
+        assert dict(accounts.summary()[alice]) == {"devices": 1}
+    with login_as_user(app, name="admin") as client:
+        page = client.get("/admin/warden/accounts").data
+        rows = page.split(b"<tbody>")[1].split(b"</tbody>")[0]
+        assert b">Players</a>" in page and b">alice<" in rows and b">admin<" not in rows
+        page = client.get(f"/admin/warden/accounts/{alice}").data
+        assert page.count(b"bob") >= 1 and b"Members:" not in page
+        page = client.get("/admin/warden/devices?player=ali").data
+        assert f"/admin/warden/accounts/{alice}".encode() in page

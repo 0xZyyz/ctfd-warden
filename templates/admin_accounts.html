@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+{% from warden_filters import filter_bar with context %}
+
+{% block content %}
+<div class="jumbotron">
+  <div class="container">
+    <h1>{{ 'Teams' if teams_mode else 'Players' }}</h1>
+    <p>Everything Warden found, per {{ 'team' if teams_mode else 'player' }}</p>
+  </div>
+</div>
+<div class="container">
+  {% include warden_nav %}
+  <p>
+    {{ 'Teams' if teams_mode else 'Players' }} with at least one signal, most first. Open one to see all of its signals on one page.
+    {% if filters.active %}With a filter, every matching {{ 'team' if teams_mode else 'player' }} is listed, even without signals.{% endif %}
+  </p>
+  {{ filter_bar(filters, 'warden.accounts_list') }}
+
+  <h3>{{ 'Teams' if teams_mode else 'Players' }} <span class="text-muted h5">({{ total }})</span></h3>
+  <div class="table-responsive"><table class="table table-hover">
+    <thead><tr><th>{{ 'Team' if teams_mode else 'Player' }}</th>{% for key, label in columns %}<th class="text-center small">{{ label }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for row in rows %}<tr>
+      <td>
+        <a href="{{ url_for('warden.account', account_id=row.id) }}">{{ row.name }}</a>
+        {% if row.account.banned %}<span class="badge badge-danger">banned</span>{% endif %}
+        {% if row.account.hidden %}<span class="badge badge-secondary">hidden</span>{% endif %}
+      </td>
+      {% for key, label in columns %}{% set n = row.counts.get(key, 0) %}
+      <td class="text-center">{% if n %}<span class="badge {{ 'badge-danger' if key in ('shared_flags', 'devices') else 'badge-warning' if key in ('bursts', 'lockouts', 'flag_sources', 'blocks') else 'badge-secondary' }}">{{ n }}</span>{% else %}<span class="text-muted">&middot;</span>{% endif %}</td>
+      {% endfor %}
+    </tr>{% else %}<tr><td colspan="{{ columns | length + 1 }}" class="text-muted">{{ 'No match.' if filters.active else 'Nothing found yet.' }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if pages > 1 %}
+  <nav class="d-flex align-items-center my-3" aria-label="Pagination">
+    {% if page > 1 %}<a class="btn btn-sm btn-outline-secondary mr-3" href="{{ url_for('warden.accounts_list', page=page - 1, **filters.args()) }}">Previous</a>{% endif %}
+    <span>Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a class="btn btn-sm btn-outline-secondary ml-3" href="{{ url_for('warden.accounts_list', page=page + 1, **filters.args()) }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

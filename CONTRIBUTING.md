@@ -15,6 +15,8 @@ devices.py               device-ID cookie and shared-device records
 lockout.py               flag brute-force lockout
 sharing.py               flag sharing (same unique flag from two accounts)
 fastsolves.py            fast solves (several solves by one player in a short time)
+accounts.py              team pages (every signal about one team or player)
+filters.py               player / team / challenge / IP filters shared by the admin pages
 blocks.py                per-account challenge blocks
 privacy.py               team privacy response filtering
 admin.py                 the admin pages

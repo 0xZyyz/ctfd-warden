@@ -1,0 +1,12 @@
+{% macro filter_bar(filters, endpoint, title=None) -%}
+<form method="GET" class="form-inline mb-3" aria-label="{{ title or 'Filters' }}">
+  {% if title %}<span class="mr-3 mb-2 text-muted">{{ title }}</span>{% endif %}
+  {% if caller is defined %}{{ caller() }}{% endif %}
+  {% for name in filters.fields %}
+  <label class="sr-only" for="filter-{{ name }}">{{ filters.labels[name] }}</label>
+  <input type="search" class="form-control mr-2 mb-2" style="width:11em" id="filter-{{ name }}" name="{{ name }}" value="{{ filters[name] }}" placeholder="{{ filters.labels[name] }}" maxlength="64">
+  {% endfor %}
+  <button class="btn btn-primary mr-2 mb-2" type="submit">Filter</button>
+  {% if filters.active or request.args.get('kind') %}<a class="btn btn-outline-secondary mb-2" href="{{ url_for(endpoint) }}">Reset</a>{% endif %}
+</form>
+{%- endmacro %}

@@ -10,6 +10,9 @@ All notable changes to this project are documented here. The format follows
 
 - Fast solves: list players who solved several challenges in a short time, with configurable
   limits and ignored challenges.
+- Team pages: one page per team (or player) with every signal Warden has about it, and a Teams
+  tab that ranks teams by signals.
+- Filters by player name, team name, challenge name and IP address on every admin page.
 
 ## [1.0.0] - 2026-10-29
 

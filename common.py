@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, request
+from flask import Blueprint, request, url_for
 
 from CTFd.models import db
 from CTFd.utils import get_config
@@ -25,6 +25,12 @@ def request_path():
 
 def teams_mode():
     return get_config("user_mode") == "teams"
+
+
+def user_url(user_id):
+    if teams_mode():
+        return url_for("admin.users_detail", user_id=user_id)
+    return url_for("warden.account", account_id=user_id)
 
 
 def account_key(user):
